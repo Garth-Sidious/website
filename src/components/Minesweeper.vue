@@ -35,7 +35,7 @@ function setupBoard(width, height, mines) {
   for (let i = 0; i < height; i++) {
     let row = []
     for (let j = 0; j < width; j++) {
-      row.push({value: '', open: false, x: i, y: j});
+      row.push({value: '', open: false, marked: false, x: i, y: j});
     }
     board.push(row)
   }
@@ -67,6 +67,15 @@ function setupBoard(width, height, mines) {
     }
   }
   return board
+}
+
+// Mark a tile on the board as a mine.
+function markTile(event, x, y) {
+  if (game.board[x][y].open || game.state !== 'playing') {
+    return
+  }
+  event.preventDefault()
+  game.board[x][y].marked = !game.board[x][y].marked;
 }
 
 // Click a tile on the board.
@@ -113,7 +122,9 @@ function resetGame() {
       <button v-for="item in row" class="minesweeper-button" 
         :class="[{ active: item.open }, { inactive: !item.open }, 'm' + item.value]"
         :disabled=item.open
+        v-on:contextmenu="markTile($event, item.x, item.y)"
         v-on:click="clickTile(item.x, item.y)" >
+        <span v-if="!item.open && item.marked" class="minesweeper-button-text">X</span>
         <span v-if="item.open" class="minesweeper-button-text" :class="['m' + item.value]">{{ item.value }}</span>
       </button>
     </div>
