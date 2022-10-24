@@ -114,7 +114,7 @@ function resetGame() {
         :class="[{ active: item.open }, { inactive: !item.open }, 'm' + item.value]"
         :disabled=item.open
         v-on:click="clickTile(item.x, item.y)" >
-        {{ item.value }}
+        <span v-if="item.open" class="minesweeper-button-text" :class="['m' + item.value]">{{ item.value }}</span>
       </button>
     </div>
   </div>
@@ -149,39 +149,37 @@ function resetGame() {
   width: 25px;
   height: 25px;
   border-radius: 0px;
-  font-weight: bold;
-  font-size: large;
 }
 
-.minesweeper-button.m1 {
+.minesweeper-button-text {
+  font-weight: bold;
+  font-size: 22px;
+  top: -4px;
+  left: -1px;
+}
+
+.minesweeper-button-text.m1 {
   color: #0023F5;
 }
-
-.minesweeper-button.m2 {
+.minesweeper-button-text.m2 {
   color: #007B00;
 }
-
-.minesweeper-button.m3 {
+.minesweeper-button-text.m3 {
   color: red;
 }
-
-.minesweeper-button.m4 {
+.minesweeper-button-text.m4 {
   color: #00007B;
 }
-
-.minesweeper-button.m5 {
+.minesweeper-button-text.m5 {
   color: #7B0000;
 }
-
-.minesweeper-button.m6 {
+.minesweeper-button-text.m6 {
   color: #007B7B;
 }
-
-.minesweeper-button.m7 {
+.minesweeper-button-text.m7 {
   color: black;
 }
-
-.minesweeper-button.m8 {
+.minesweeper-button-text.m8 {
   color: #7B7B7B;
 }
 
@@ -192,7 +190,6 @@ function resetGame() {
 }
 
 .minesweeper-button.inactive {
-  color: rgba(0, 0, 0, 0);
   border-bottom-color: #7B7B7B;
   border-right-color: #7B7B7B;
   border-left-color: white;
