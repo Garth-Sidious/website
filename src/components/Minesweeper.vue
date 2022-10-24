@@ -4,7 +4,7 @@ import { reactive } from 'vue'
 // Game states: playing, won, lost
 let width = 9
 let height = 9
-let mineCount = Math.min(10, width * height) //Sanity check for mine count
+let mineCount = 10 //Sanity check for mine count
 let game = reactive({})
 resetGame()
 
@@ -92,6 +92,14 @@ function clickTile(x, y) {
   if (game.board[x][y].value === 'M') {
     // Clicking a mine causes you to lose
     game.state = 'lost'
+    game.board[x][y].value = 'E' //Exploded
+    for (let i = 0; i < height; i++) {
+      for (let j = 0; j < width; j++) {
+        if (game.board[i][j].value === 'M') {
+          game.board[i][j].open = true
+        }
+      }
+    }
     return
   }
 
@@ -112,21 +120,21 @@ function clickTile(x, y) {
 function resetGameBeginner() {
   width = 9
   height = 9
-  mines = 10
+  mineCount = 10
   resetGame()
 }
 
 function resetGameIntermediate() {
   width = 16
   height = 16
-  mines = 40
+  mineCount = 40
   resetGame()
 }
 
 function resetGameExpert() {
-  width = 16
-  height = 30
-  mines = 99
+  width = 30
+  height = 16
+  mineCount = 99
   resetGame()
 }
 
@@ -149,8 +157,9 @@ function resetGame() {
         :disabled=item.open
         v-on:contextmenu="markTile($event, item.x, item.y)"
         v-on:click="clickTile(item.x, item.y)" >
-        <span v-if="!item.open && item.marked" class="minesweeper-button-text">X</span>
-        <span v-if="item.open" class="minesweeper-button-text" :class="['m' + item.value]">{{ item.value }}</span>
+        <img class="minesweeper-flag" v-if="!item.open && item.marked" src="@/assets/flag.svg">
+        <img class="minesweeper-bomb" v-if="item.open && (item.value === 'M' || item.value === 'E')" src="@/assets/bomb.svg">
+        <span v-if="item.open && item.value !== 'M'" class="minesweeper-button-text" :class="['m' + item.value]">{{ item.value }}</span>
       </button>
     </div>
   </div>
@@ -254,5 +263,23 @@ function resetGame() {
   display: block;
   margin: auto;
 }
+
+.minesweeper-flag {
+  width: 120%;
+  height: auto;
+  top: 1px;
+  left: -1px;
+}
+.minesweeper-bomb {
+  width: 130%;
+  height: auto;
+  left: -2px;
+}
+
+.minesweeper-button.mE {
+  background-color: #FF0000;
+  border: none;
+}
+
 
 </style>
