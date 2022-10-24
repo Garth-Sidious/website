@@ -73,12 +73,20 @@ function setupBoard(width, height, mines, x, y) {
   return board
 }
 
-// Mark a tile on the board as a mine.
-function markTile(event, x, y) {
+// Mark a tile on the board as a mine and disable right click events.
+function markTileRightClick(event, x, y) {
   if (game.board[x][y].open || game.state !== 'playing') {
     return
   }
   event.preventDefault()
+  markTile(x, y)
+}
+
+// Mark a tile on the board as a mine.
+function markTile(x, y) {
+  if (game.board[x][y].open || game.state !== 'playing') {
+    return
+  }
   if (game.board[x][y].marked) {
     game.board[x][y].marked = false
     game.markedTiles -= 1
@@ -121,6 +129,13 @@ function clickTile(x, y) {
   if (game.tilesLeft === 0) {
     // No tiles left to reveal means a win
     game.state = 'won'
+    for (let i = 0; i < height; i++) {
+      for (let j = 0; j < width; j++) {
+        if (game.board[i][j].value === 'M') {
+          game.board[i][j].marked = true
+        }
+      }
+    }
     return
   }
 
@@ -162,6 +177,95 @@ function resetGame() {
 }
 
 //Functions for a minesweeper solver implementation, to investigate how hard minesweeper is
+function runSolverTests() {
+  resetGameBeginner()
+  clickTile(4, 4)
+  solveBoard(0)
+  while (game.state == 'won') {
+    resetGameBeginner()
+    clickTile(4, 4)
+    solveBoard(0)
+  }
+}
+
+//Solve the main game board
+function solveBoard(depth) {
+  if (depth > 1000) {
+    return
+  }
+  let frontier = getFrontier()
+  let progress = false
+  for (let tile of frontier) {
+    if (trivialSolveTile(tile, depth)) {
+      progress = true
+    }
+  }
+  if (progress) {
+    solveBoard(depth += 1)
+  }
+}
+
+//Get a list of all tiles worth investigating on the main board 
+//(all number tiles with less flags next to them than the number on the tile)
+function getFrontier() {
+  let frontier = []
+  for (let i = 0; i < height; i++) {
+    for (let j = 0; j < width; j++) {
+      let tile = game.board[i][j]
+      if (frontierTile(tile)) {
+        frontier.push(tile)
+      }
+    }
+  }
+  return frontier
+}
+
+function frontierTile(tile) {
+  if (tile.open && tile.value in '123456789'.split('')) {
+    let closedNeighbours = 0
+    for (let neighbour of neighbours(game.board, tile.x, tile.y)) {
+      if (!neighbour.open && !neighbour.marked) {
+        closedNeighbours += 1
+      }
+    }
+    return closedNeighbours > 0
+  }
+  return false
+}
+
+function trivialSolveTile(tile, depth) {
+  let minesLeft = parseInt(tile.value)
+  let closedTiles = 0
+  for (let neighbour of neighbours(game.board, tile.x, tile.y)) {
+    if (neighbour.marked) {
+      minesLeft -= 1
+    } else if (!neighbour.open) {
+      closedTiles += 1
+    }
+  }
+  if (minesLeft === 0) {
+    if (depth > 990) {
+      console.log('none left on', tile.x, tile.y)
+    }
+    for (let neighbour of neighbours(game.board, tile.x, tile.y)) {
+      if (!neighbour.marked && !neighbour.open) {
+        clickTile(neighbour.x, neighbour.y)
+      }
+    }
+    return true
+  } else if (minesLeft === closedTiles) {
+    if (depth > 990) {
+      console.log('can mark mines on', tile.x, tile.y)
+    }
+    for (let neighbour of neighbours(game.board, tile.x, tile.y)) {
+      if (!neighbour.marked && !neighbour.open) {
+        markTile(neighbour.x, neighbour.y)
+      }
+    }
+    return true
+  }
+  return false
+}
 
 </script>
 
@@ -176,7 +280,7 @@ function resetGame() {
       <button v-for="item in row" class="minesweeper-button" 
         :class="[{ active: item.open }, { inactive: !item.open }, 'm' + item.value]"
         :disabled=item.open
-        v-on:contextmenu="markTile($event, item.x, item.y)"
+        v-on:contextmenu="markTileRightClick($event, item.x, item.y)"
         v-on:click="clickTile(item.x, item.y)" >
         <img class="minesweeper-flag" v-if="!item.open && item.marked" src="@/assets/flag.svg">
         <img class="minesweeper-bomb" v-if="item.open && (item.value === 'M' || item.value === 'E')" src="@/assets/bomb.svg">
@@ -188,6 +292,7 @@ function resetGame() {
   <button v-on:click="resetGameBeginner" id="minesweeper-new-game-button">New Beginner Game</button>
   <button v-on:click="resetGameIntermediate" id="minesweeper-new-game-button">New Intermediate Game</button>
   <button v-on:click="resetGameExpert" id="minesweeper-new-game-button">New Expert Game</button>
+  <button v-on:click="runSolverTests" id="minesweeper-new-game-button">Autosolve (For Dev Use)</button>
   <h2 v-if="game.state === 'won'">You Won! B)</h2>
   <h2 v-if="game.state === 'lost'">You Lost :(</h2>
 </template>
@@ -298,7 +403,7 @@ function resetGame() {
 }
 
 .minesweeper-button.mE {
-  background-color: #FF0000;
+  background-color: red;
   border: none;
 }
 
