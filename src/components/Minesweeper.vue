@@ -2,9 +2,9 @@
 import { reactive } from 'vue'
 
 // Game states: playing, won, lost
-const width = 5
-const height = 5
-const mineCount = Math.min(3, width * height) //Sanity check for mine count
+let width = 9
+let height = 9
+let mineCount = Math.min(10, width * height) //Sanity check for mine count
 let game = reactive({})
 resetGame()
 
@@ -109,6 +109,27 @@ function clickTile(x, y) {
   }
 }
 
+function resetGameBeginner() {
+  width = 9
+  height = 9
+  mines = 10
+  resetGame()
+}
+
+function resetGameIntermediate() {
+  width = 16
+  height = 16
+  mines = 40
+  resetGame()
+}
+
+function resetGameExpert() {
+  width = 16
+  height = 30
+  mines = 99
+  resetGame()
+}
+
 function resetGame() {
   game.board = setupBoard(width, height, mineCount)
   game.state = 'playing',
@@ -134,7 +155,9 @@ function resetGame() {
     </div>
   </div>
   <h4 id="minesweeper-mines-left-display">Mines Left: {{ game.minesLeft }}</h4>
-  <button v-on:click="resetGame" id="minesweeper-new-game-button">New Game</button>
+  <button v-on:click="resetGameBeginner" id="minesweeper-new-game-button">New Beginner Game</button>
+  <button v-on:click="resetGameIntermediate" id="minesweeper-new-game-button">New Intermediate Game</button>
+  <button v-on:click="resetGameExpert" id="minesweeper-new-game-button">New Expert Game</button>
   <h2 v-if="game.state === 'won'">You Won! B)</h2>
   <h2 v-if="game.state === 'lost'">You Lost :(</h2>
 </template>
@@ -223,6 +246,7 @@ function resetGame() {
   background-color: #BDBDBD;
   display: block;
   margin: auto;
+  margin-bottom: 5px;
 }
 
 #minesweeper-mines-left-display {
