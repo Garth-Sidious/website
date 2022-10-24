@@ -5,12 +5,8 @@ import { reactive } from 'vue'
 const width = 5
 const height = 5
 const mineCount = Math.min(3, width * height) //Sanity check for mine count
-let game = reactive({
-  board: setupBoard(width, height, mineCount), 
-  state: 'playing', 
-  tilesLeft: width * height - mineCount, 
-  mines: mineCount,
-  minesLeft: mineCount})
+let game = reactive({})
+resetGame()
 
 // Gets the 8 (or sometimes less) neighbours of a tile, given the coordinates of the tile and a board.
 function neighbours(board, x, y) {
@@ -75,13 +71,20 @@ function markTile(event, x, y) {
     return
   }
   event.preventDefault()
-  game.board[x][y].marked = !game.board[x][y].marked;
+  if (game.board[x][y].marked) {
+    game.board[x][y].marked = false
+    game.markedTiles -= 1
+  } else {
+    game.board[x][y].marked = true
+    game.markedTiles += 1
+  }
+  game.minesLeft = game.mines - game.markedTiles
 }
 
 // Click a tile on the board.
 // If the tile is empty, clicks the 8 tiles around it too.
 function clickTile(x, y) {
-  if (game.board[x][y].open || game.state !== 'playing') {
+  if (game.board[x][y].open || game.board[x][y].marked || game.state !== 'playing') {
     return
   }
   game.board[x][y].open = true;
@@ -111,6 +114,7 @@ function resetGame() {
   game.state = 'playing',
   game.tilesLeft = width * height - mineCount
   game.mines = mineCount
+  game.markedTiles = 0;
   game.minesLeft = mineCount
 }
 </script>
