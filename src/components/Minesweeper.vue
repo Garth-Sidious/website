@@ -1,7 +1,7 @@
 <script setup>
 import { reactive } from 'vue'
 
-// Game states: playing, won, lost
+// Game states: setup (board displayed but not filled with mines), playing, won, lost
 let width = 9
 let height = 9
 let mineCount = 10 //Sanity check for mine count
@@ -23,9 +23,8 @@ function neighbours(board, x, y) {
   return result
 }
 
-// Set up a minesweeper board with a width, height, and a number of mines.
-// Mines should not be more than width * height.
-function setupBoard(width, height, mines) {
+// Create a blank minesweeper board, for setup use.
+function blankBoard(width, height) {
   // Create board
   let board = []
   for (let i = 0; i < height; i++) {
@@ -35,11 +34,20 @@ function setupBoard(width, height, mines) {
     }
     board.push(row)
   }
+  return board
+}
+
+// Set up a minesweeper board with a width, height, and a number of mines.
+// Also takes a click position x, y. This square or its neighbours cannot be mines.
+// Mines should not be more than width * height.
+function setupBoard(width, height, mines, x, y) {
+  // Create board
+  let board = blankBoard(width, height)
   // Add mines
   for (let m = 0; m < mines; m++) {
     let i = Math.floor(Math.random() * height)
     let j = Math.floor(Math.random() * width)
-    while (board[i][j].value === "M") {
+    while (board[i][j].value === "M" || (Math.abs(x - i) <= 1 && Math.abs(y - j) <= 1)) {
       i = Math.floor(Math.random() * height)
       j = Math.floor(Math.random() * width)
     }
@@ -78,12 +86,18 @@ function markTile(event, x, y) {
     game.board[x][y].marked = true
     game.markedTiles += 1
   }
-  game.minesLeft = game.mines - game.markedTiles
+  game.minesLeft = Math.max(0, game.mines - game.markedTiles)
 }
 
 // Click a tile on the board.
 // If the tile is empty, clicks the 8 tiles around it too.
 function clickTile(x, y) {
+  if (game.state === 'setup') {
+    game.board = setupBoard(width, height, mineCount, x, y)
+    game.state = 'playing'
+    clickTile(x, y)
+    return
+  }
   if (game.board[x][y].open || game.board[x][y].marked || game.state !== 'playing') {
     return
   }
@@ -139,17 +153,24 @@ function resetGameExpert() {
 }
 
 function resetGame() {
-  game.board = setupBoard(width, height, mineCount)
-  game.state = 'playing',
+  game.board = blankBoard(width, height)
+  game.state = 'setup',
   game.tilesLeft = width * height - mineCount
   game.mines = mineCount
   game.markedTiles = 0;
   game.minesLeft = mineCount
 }
+
+//Functions for a minesweeper solver implementation, to investigate how hard minesweeper is
+
 </script>
 
 <template>
-  <h1 id="minesweeper-header">Minesweeper Prototype</h1>
+  <div style="display: none;">
+    <img src="@/assets/flag.svg">
+    <img src="@/assets/bomb.svg">
+  </div>
+  <h1 id="minesweeper-header">Minesweeper</h1>
   <div id="minesweeper-container">
     <div v-for="row in game.board" class="minesweeper-row">
       <button v-for="item in row" class="minesweeper-button" 
