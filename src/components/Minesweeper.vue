@@ -35,7 +35,7 @@ function setupBoard(width, height, mines) {
   for (let i = 0; i < height; i++) {
     let row = []
     for (let j = 0; j < width; j++) {
-      row.push({value : '', open : false, x: i, y: j});
+      row.push({value: '', open: false, x: i, y: j});
     }
     board.push(row)
   }
@@ -61,7 +61,7 @@ function setupBoard(width, height, mines) {
         }
         // If mines is 0, leave the tile blank
         if (mines > 0) {
-          board[i][j].value = mines
+          board[i][j].value = mines.toString()
         }
       }
     }
@@ -111,7 +111,7 @@ function resetGame() {
   <div id="minesweeper-container">
     <div v-for="row in game.board" class="minesweeper-row">
       <button v-for="item in row" class="minesweeper-button" 
-        :class="{ active: item.open, inactive: !item.open }"
+        :class="[{ active: item.open }, { inactive: !item.open }, 'm' + item.value]"
         :disabled=item.open
         v-on:click="clickTile(item.x, item.y)" >
         {{ item.value }}
@@ -134,8 +134,8 @@ function resetGame() {
   display: inline-block;
   border-bottom-color: white;
   border-right-color: white;
-  border-left-color: gray;
-  border-top-color: gray;
+  border-left-color: #7B7B7B;
+  border-top-color: #7B7B7B;
   border-width: 3px;
   border-style: solid;
 }
@@ -149,33 +149,66 @@ function resetGame() {
   width: 25px;
   height: 25px;
   border-radius: 0px;
+  font-weight: bold;
+  font-size: large;
+}
+
+.minesweeper-button.m1 {
+  color: #0023F5;
+}
+
+.minesweeper-button.m2 {
+  color: #007B00;
+}
+
+.minesweeper-button.m3 {
+  color: red;
+}
+
+.minesweeper-button.m4 {
+  color: #00007B;
+}
+
+.minesweeper-button.m5 {
+  color: #7B0000;
+}
+
+.minesweeper-button.m6 {
+  color: #007B7B;
+}
+
+.minesweeper-button.m7 {
+  color: black;
+}
+
+.minesweeper-button.m8 {
+  color: #7B7B7B;
 }
 
 .minesweeper-button.active {
-  color: black;
   border-width: 1px;
-  border-color: silver;
-  background-color: silver;
+  border-color: #BDBDBD;
+  background-color: #BDBDBD;
 }
 
 .minesweeper-button.inactive {
   color: rgba(0, 0, 0, 0);
-  border-bottom-color: gray;
-  border-right-color: gray;
+  border-bottom-color: #7B7B7B;
+  border-right-color: #7B7B7B;
   border-left-color: white;
   border-top-color: white;
   border-width: 3px;
-  background-color: silver;
+  background-color: #BDBDBD;
 }
 
 #minesweeper-new-game-button {
   border-radius: 0px;
-  border-bottom-color: gray;
-  border-right-color: gray;
+  border-bottom-color: #7B7B7B;
+  border-right-color: #7B7B7B;
   border-left-color: white;
   border-top-color: white;
   border-width: 3px;
-  background-color: silver;
+  background-color: #BDBDBD;
   display: block;
   margin: auto;
 }
