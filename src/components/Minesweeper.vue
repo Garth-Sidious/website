@@ -108,7 +108,7 @@ function markTile(game, tile) {
 
 // Click a tile on the board.
 // If the tile is empty, clicks the 8 tiles around it too.
-function clickTile(game, tile) {
+function clickTile(game, tile, percolate = true) {
   if (game.state === 'setup') {
     game.generator(game, tile)
     game.state = 'playing'
@@ -142,7 +142,7 @@ function clickTile(game, tile) {
     return
   }
 
-  if (tile.value === '') {
+  if (tile.value === '' && percolate) {
     for (let neighbour of neighbours(game.board, tile)) {
       clickTile(game, neighbour)
     }
@@ -179,11 +179,11 @@ function smartSetupBeginner(game, clickedTile) {
   let testGame = {}
   resetGame(testGame, 9, 9, 10, setupBoard)
   clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
-  solveGame(testGame)
+  solveGameBeginner(testGame)
   while (testGame.state == 'playing') {
     resetGame(testGame, 9, 9, 10, setupBoard)
     clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
-    solveGame(testGame)
+    solveGameBeginner(testGame)
   }
   resetBoard(testGame.board)
   for (let tile of allTiles(testGame.board)) {
@@ -192,28 +192,32 @@ function smartSetupBeginner(game, clickedTile) {
 }
 
 function runSolverTests(game) {
-  for (let i = 0; i < 100; i++) {
-    resetGameBeginner(game)
+  let count = 1000
+  let cycleTracker = []
+  for (let i = 0; i < count; i++) {
+    resetGame(game, 16, 16, 40, setupBoard)
+    cycleTracker.push(0)
     clickTile(game, game.board[4][4])
-    solveGame(game)
-    console.log(game.state)
+    solveGameBeginner(game, cycleTracker)
   }
+  console.log(cycleTracker)
+  cycleTracker.sort((a, b) => a - b)
+  console.log(cycleTracker[0])
+  console.log(cycleTracker[~~(count / 10)])
+  console.log(cycleTracker[~~(count / 2)])
+  console.log(cycleTracker[~~(count * 9 / 10)])
+  console.log(cycleTracker[cycleTracker.length - 1])
 }
 
-//Solve a game board
-function solveGame(game, depth = 0) {
-  if (depth > 1000) {
-    return
-  }
+//Solve a game board with beginner strategies.
+function solveGameBeginner(game, cycleTracker) {
   let frontier = getFrontier(game.board)
-  let progress = false
-  for (let tile of frontier) {
-    if (trivialSolveTile(game, tile)) {
-      progress = true
-    }
-  }
-  if (progress) {
-    solveGame(game, depth + 1)
+  let frontierSet = new Set(frontier)
+  while (frontier.length > 0) {
+    cycleTracker[cycleTracker.length - 1] += 1
+    let tile = frontier.pop()
+    frontierSet.delete(tile)
+    trivialSolveTile(game, tile, frontier, frontierSet)
   }
 }
 
@@ -229,7 +233,7 @@ function getFrontier(board) {
   return frontier
 }
 
-function frontierTile(board, tile) {
+function frontierTile(board, tile, frontier, frontierSet) {
   if (tile.open && tile.value in '123456789'.split('')) {
     let closedNeighbours = 0
     for (let neighbour of neighbours(board, tile)) {
@@ -242,7 +246,7 @@ function frontierTile(board, tile) {
   return false
 }
 
-function trivialSolveTile(game, tile) {
+function trivialSolveTile(game, tile, frontier, frontierSet) {
   let minesLeft = parseInt(tile.value)
   let closedTiles = 0
   for (let neighbour of neighbours(game.board, tile)) {
@@ -255,7 +259,9 @@ function trivialSolveTile(game, tile) {
   if (minesLeft === 0) {
     for (let neighbour of neighbours(game.board, tile)) {
       if (!neighbour.marked && !neighbour.open) {
-        clickTile(game, neighbour)
+        clickTile(game, neighbour, false)
+        frontier.push(neighbour)
+        frontierSet.add(neighbour)
       }
     }
     return true
@@ -263,6 +269,12 @@ function trivialSolveTile(game, tile) {
     for (let neighbour of neighbours(game.board, tile)) {
       if (!neighbour.marked && !neighbour.open) {
         markTile(game, neighbour)
+        for (let grandneighbour of neighbours(game.board, neighbour)) {
+          if (!frontierSet.has(grandneighbour)) {
+            frontier.push(grandneighbour)
+            frontierSet.add(grandneighbour)
+          }
+        }
       }
     }
     return true
