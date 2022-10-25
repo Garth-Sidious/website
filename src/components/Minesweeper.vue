@@ -73,7 +73,6 @@ function setupBoard(board, width, height, mines, clickedTile) {
       }
     }
   }
-  console.log(board)
   return board
 }
 
@@ -145,7 +144,7 @@ function clickTile(game, tile) {
 }
 
 function resetGameBeginner(game) {
-  resetGame(game, 5, 5, 3)
+  resetGame(game, 9, 9, 10)
 }
 
 function resetGameIntermediate(game) {
@@ -171,50 +170,44 @@ function resetGame(game, width, height, mineCount) {
 function runSolverTests(game) {
   resetGameBeginner(game)
   clickTile(game, game.board[4][4])
-  solveBoard(0)
+  solveGame(game)
   while (game.state == 'won') {
     resetGameBeginner(game)
     clickTile(game, game.board[4][4])
-    solveBoard(0)
+    solveGame(game)
   }
 }
 
-//Solve the main game board
-function solveBoard(depth) {
-  if (depth > 1000) {
-    return
-  }
-  let frontier = getFrontier()
+//Solve a game board
+function solveGame(game) {
+  let frontier = getFrontier(game.board)
   let progress = false
   for (let tile of frontier) {
-    if (trivialSolveTile(tile, depth)) {
+    if (trivialSolveTile(game, tile)) {
       progress = true
     }
   }
   if (progress) {
-    solveBoard(depth += 1)
+    solveGame(game)
   }
 }
 
-//Get a list of all tiles worth investigating on the main board 
+//Get a list of all tiles worth investigating on a board 
 //(all number tiles with less flags next to them than the number on the tile)
-function getFrontier() {
+function getFrontier(board) {
   let frontier = []
-  for (let i = 0; i < height; i++) {
-    for (let j = 0; j < width; j++) {
-      let tile = game.board[i][j]
-      if (frontierTile(tile)) {
-        frontier.push(tile)
-      }
+  for (let tile of allTiles(board)) {
+    if (frontierTile(board, tile)) {
+      frontier.push(tile)
     }
   }
   return frontier
 }
 
-function frontierTile(tile) {
+function frontierTile(board, tile) {
   if (tile.open && tile.value in '123456789'.split('')) {
     let closedNeighbours = 0
-    for (let neighbour of neighbours(game.board, tile.x, tile.y)) {
+    for (let neighbour of neighbours(board, tile)) {
       if (!neighbour.open && !neighbour.marked) {
         closedNeighbours += 1
       }
@@ -224,10 +217,10 @@ function frontierTile(tile) {
   return false
 }
 
-function trivialSolveTile(tile) {
+function trivialSolveTile(game, tile) {
   let minesLeft = parseInt(tile.value)
   let closedTiles = 0
-  for (let neighbour of neighbours(game.board, tile.x, tile.y)) {
+  for (let neighbour of neighbours(game.board, tile)) {
     if (neighbour.marked) {
       minesLeft -= 1
     } else if (!neighbour.open) {
@@ -235,14 +228,14 @@ function trivialSolveTile(tile) {
     }
   }
   if (minesLeft === 0) {
-    for (let neighbour of neighbours(game.board, tile.x, tile.y)) {
+    for (let neighbour of neighbours(game.board, tile)) {
       if (!neighbour.marked && !neighbour.open) {
-        clickTile(neighbour.x, neighbour.y)
+        clickTile(game, neighbour)
       }
     }
     return true
   } else if (minesLeft === closedTiles) {
-    for (let neighbour of neighbours(game.board, tile.x, tile.y)) {
+    for (let neighbour of neighbours(game.board, tile)) {
       if (!neighbour.marked && !neighbour.open) {
         markTile(game, neighbour)
       }
