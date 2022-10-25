@@ -47,22 +47,22 @@ function blankBoard(width, height) {
 
 // Set up a minesweeper board with a blank board, width, height, and a number of mines.
 // Also takes a clicked tile. This tile or its neighbours cannot be mines.
-function setupBoard(board, width, height, mines, clickedTile) {
+function setupBoard(game, clickedTile) {
   // Add mines
-  for (let m = 0; m < mines; m++) {
-    let i = Math.floor(Math.random() * height)
-    let j = Math.floor(Math.random() * width)
-    while (board[i][j].value === "M" || (Math.abs(clickedTile.x - i) <= 1 && Math.abs(clickedTile.y - j) <= 1)) {
-      i = Math.floor(Math.random() * height)
-      j = Math.floor(Math.random() * width)
+  for (let m = 0; m < game.mines; m++) {
+    let i = Math.floor(Math.random() * game.height)
+    let j = Math.floor(Math.random() * game.width)
+    while (game.board[i][j].value === "M" || (Math.abs(clickedTile.x - i) <= 1 && Math.abs(clickedTile.y - j) <= 1)) {
+      i = Math.floor(Math.random() * game.height)
+      j = Math.floor(Math.random() * game.width)
     }
-    board[i][j].value = "M"
+    game.board[i][j].value = "M"
   }
   // Add numbers
-  for (let tile of allTiles(board)) {
+  for (let tile of allTiles(game.board)) {
     if (tile.value !== "M") {
       let mines = 0
-      for (let neighbour of neighbours(board, tile)) {
+      for (let neighbour of neighbours(game.board, tile)) {
         if (neighbour.value === 'M') {
           mines += 1
         }
@@ -73,7 +73,13 @@ function setupBoard(board, width, height, mines, clickedTile) {
       }
     }
   }
-  return board
+}
+
+function resetBoard(board) {
+  for (let tile of allTiles(board)) {
+    tile.open = false
+    tile.marked = false
+  }
 }
 
 // Mark a tile on the board as a mine and disable right click events.
@@ -104,7 +110,7 @@ function markTile(game, tile) {
 // If the tile is empty, clicks the 8 tiles around it too.
 function clickTile(game, tile) {
   if (game.state === 'setup') {
-    game.board = setupBoard(game.board, game.width, game.height, game.mines, tile)
+    game.generator(game, tile)
     game.state = 'playing'
   }
   if (tile.open || tile.marked || game.state !== 'playing') {
@@ -144,42 +150,61 @@ function clickTile(game, tile) {
 }
 
 function resetGameBeginner(game) {
-  resetGame(game, 9, 9, 10)
+  resetGame(game, 9, 9, 10, smartSetupBeginner)
 }
 
 function resetGameIntermediate(game) {
-  resetGame(game, 16, 16, 40)
+  resetGame(game, 16, 16, 40, setupBoard)
 }
 
 function resetGameExpert(game) {
-  resetGame(game, 30, 16, 99)
+  resetGame(game, 30, 16, 99, setupBoard)
 }
 
-function resetGame(game, width, height, mineCount) {
+function resetGame(game, width, height, mineCount, generator) {
   game.board = blankBoard(width, height)
   game.state = 'setup'
   game.width = width
   game.height = height
   game.tilesLeft = width * height - mineCount
   game.mines = mineCount
-  game.markedTiles = 0;
+  game.markedTiles = 0
   game.minesLeft = mineCount
+  game.generator = generator
 }
 
 //Functions for a minesweeper solver implementation, to investigate how hard minesweeper is
+//Also for use in always generating solvable boards.
+function smartSetupBeginner(game, clickedTile) {
+  let testGame = {}
+  resetGame(testGame, 9, 9, 10, setupBoard)
+  clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
+  solveGame(testGame)
+  while (testGame.state == 'playing') {
+    resetGame(testGame, 9, 9, 10, setupBoard)
+    clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
+    solveGame(testGame)
+  }
+  resetBoard(testGame.board)
+  for (let tile of allTiles(testGame.board)) {
+    game.board[tile.x][tile.y].value = tile.value
+  }
+}
+
 function runSolverTests(game) {
-  resetGameBeginner(game)
-  clickTile(game, game.board[4][4])
-  solveGame(game)
-  while (game.state == 'won') {
+  for (let i = 0; i < 100; i++) {
     resetGameBeginner(game)
     clickTile(game, game.board[4][4])
     solveGame(game)
+    console.log(game.state)
   }
 }
 
 //Solve a game board
-function solveGame(game) {
+function solveGame(game, depth = 0) {
+  if (depth > 1000) {
+    return
+  }
   let frontier = getFrontier(game.board)
   let progress = false
   for (let tile of frontier) {
@@ -188,7 +213,7 @@ function solveGame(game) {
     }
   }
   if (progress) {
-    solveGame(game)
+    solveGame(game, depth + 1)
   }
 }
 
