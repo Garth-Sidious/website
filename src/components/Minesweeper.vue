@@ -3,7 +3,7 @@ import { reactive } from 'vue'
 
 // Game states: setup (board displayed but not filled with mines), playing, won, lost
 let mainGame = reactive({})
-resetGameBeginner(mainGame)
+resetGame(mainGame, 9, 9, 10, setupBoard)
 
 // Gets the 8 (or sometimes less) neighbours of a tile, given a board and a tile.
 function neighbours(board, tile) {
@@ -18,6 +18,10 @@ function neighbours(board, tile) {
     }
   }
   return tiles
+}
+
+function areNeighbours(a, b) {
+  return Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1
 }
 
 // Gets every tile on a board
@@ -149,18 +153,6 @@ function clickTile(game, tile, percolate = true) {
   }
 }
 
-function resetGameBeginner(game) {
-  resetGame(game, 9, 9, 10, smartSetupBeginner)
-}
-
-function resetGameIntermediate(game) {
-  resetGame(game, 16, 16, 40, setupBoard)
-}
-
-function resetGameExpert(game) {
-  resetGame(game, 30, 16, 99, setupBoard)
-}
-
 function resetGame(game, width, height, mineCount, generator) {
   game.board = blankBoard(width, height)
   game.state = 'setup'
@@ -171,6 +163,15 @@ function resetGame(game, width, height, mineCount, generator) {
   game.markedTiles = 0
   game.minesLeft = mineCount
   game.generator = generator
+}
+
+//Reset the game to playing state, but keep the same board.
+function resetGameStatic(game) {
+  resetBoard(game.board)
+  game.state = 'playing'
+  game.tilesLeft = game.width * game.height - game.mines
+  game.markedTiles = 0
+  game.minesLeft = game.mines
 }
 
 //Functions for a minesweeper solver implementation, to investigate how hard minesweeper is
@@ -191,63 +192,102 @@ function smartSetupBeginner(game, clickedTile) {
   }
 }
 
+function smartSetupIntermediate(game, clickedTile) {
+  let testGame = {}
+  resetGame(testGame, 16, 16, 40, setupBoard)
+  clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
+  solveGameBeginner(testGame)
+  let solvedBeginner = testGame.state === 'won'
+  resetGameStatic(testGame)
+  clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
+  solveGameIntermediate(testGame)
+  let solvedIntermediate = testGame.state === 'won'
+  while (solvedBeginner || !solvedIntermediate) {
+    resetGame(testGame, 16, 16, 40, setupBoard)
+    clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
+    solveGameBeginner(testGame)
+    solvedBeginner = testGame.state === 'won'
+    resetGameStatic(testGame)
+    clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
+    solveGameIntermediate(testGame)
+    solvedIntermediate = testGame.state === 'won'
+  }
+  resetBoard(testGame.board)
+  for (let tile of allTiles(testGame.board)) {
+    game.board[tile.x][tile.y].value = tile.value
+  }
+}
+
 function runSolverTests(game) {
   let count = 1000
-  let cycleTracker = []
+  let solved = 0
+  let downgrades = 0
+  let improvements = 0
+  let unsolved = 0
   for (let i = 0; i < count; i++) {
-    resetGame(game, 16, 16, 40, setupBoard)
-    cycleTracker.push(0)
+    resetGame(game, 30, 16, 99, setupBoard)
     clickTile(game, game.board[4][4])
-    solveGameBeginner(game, cycleTracker)
+    solveGameBeginner(game)
+    let solvedBeginner = game.state === 'won'
+    resetGameStatic(game)
+    clickTile(game, game.board[4][4])
+    solveGameIntermediate(game)
+    let solvedIntermediate = game.state === 'won'
+    if (solvedBeginner && solvedIntermediate) {
+      solved += 1
+    }
+    if (solvedBeginner && !solvedIntermediate) {
+      downgrades += 1
+    }
+    if (!solvedBeginner && solvedIntermediate) {
+      improvements += 1
+    }
+    if (!solvedBeginner && !solvedIntermediate) {
+      unsolved += 1
+    }
   }
-  console.log(cycleTracker)
-  cycleTracker.sort((a, b) => a - b)
-  console.log(cycleTracker[0])
-  console.log(cycleTracker[~~(count / 10)])
-  console.log(cycleTracker[~~(count / 2)])
-  console.log(cycleTracker[~~(count * 9 / 10)])
-  console.log(cycleTracker[cycleTracker.length - 1])
+  console.log('solved: ', solved)
+  console.log('downgrades: ', downgrades)
+  console.log('improvements: ', improvements)
+  console.log('unsolved: ', unsolved)
 }
 
 //Solve a game board with beginner strategies.
-function solveGameBeginner(game, cycleTracker) {
-  let frontier = getFrontier(game.board)
-  let frontierSet = new Set(frontier)
-  while (frontier.length > 0) {
+function solveGameBeginner(game, cycleTracker=[0]) {
+  let frontier = new Frontier(game.board)
+  while (!frontier.isEmpty()) {
     cycleTracker[cycleTracker.length - 1] += 1
-    let tile = frontier.pop()
-    frontierSet.delete(tile)
-    trivialSolveTile(game, tile, frontier, frontierSet)
+    trivialSolver(game, frontier.pop(), frontier)
   }
 }
 
-//Get a list of all tiles worth investigating on a board 
-//(all number tiles with less flags next to them than the number on the tile)
-function getFrontier(board) {
-  let frontier = []
-  for (let tile of allTiles(board)) {
-    if (frontierTile(board, tile)) {
-      frontier.push(tile)
-    }
-  }
-  return frontier
-}
-
-function frontierTile(board, tile, frontier, frontierSet) {
-  if (tile.open && tile.value in '123456789'.split('')) {
-    let closedNeighbours = 0
-    for (let neighbour of neighbours(board, tile)) {
-      if (!neighbour.open && !neighbour.marked) {
-        closedNeighbours += 1
+//Solve a game board with intermediate strategies.
+function solveGameIntermediate(game, cycleTracker=[0]) {
+  let functions = [trivialSolver, dominationSolver, avoidanceSolver, supplySolver]
+  let frontiers = new MultiFrontier(game.board, functions)
+  let frontier = 0
+  while (frontier < functions.length) {
+    while (!frontiers.get(frontier).isEmpty()) {
+      cycleTracker[cycleTracker.length - 1] += 1
+      if (functions[frontier](game, frontiers.pop(frontier), frontiers)) {
+        frontier = 0
+        if (game.state === 'won') {
+          return
+        }
       }
     }
-    return closedNeighbours > 0
+    frontier += 1
   }
-  return false
 }
 
-function trivialSolveTile(game, tile, frontier, frontierSet) {
+// Solves a specific tile of a minesweeper game with trivial methods.
+// Specifically, if a tile has no mines left to mark around it, open all other tiles next to it,
+// and if a tile has n closed tiles around it and n mines left, mark all those squares.
+function trivialSolver(game, tile, frontier) {
   let minesLeft = parseInt(tile.value)
+  if (tile.value == '') {
+    minesLeft = 0
+  }
   let closedTiles = 0
   for (let neighbour of neighbours(game.board, tile)) {
     if (neighbour.marked) {
@@ -261,7 +301,9 @@ function trivialSolveTile(game, tile, frontier, frontierSet) {
       if (!neighbour.marked && !neighbour.open) {
         clickTile(game, neighbour, false)
         frontier.push(neighbour)
-        frontierSet.add(neighbour)
+        for (let grandneighbour of neighbours(game.board, neighbour)) {
+          frontier.push(grandneighbour)
+        }
       }
     }
     return true
@@ -270,10 +312,7 @@ function trivialSolveTile(game, tile, frontier, frontierSet) {
       if (!neighbour.marked && !neighbour.open) {
         markTile(game, neighbour)
         for (let grandneighbour of neighbours(game.board, neighbour)) {
-          if (!frontierSet.has(grandneighbour)) {
-            frontier.push(grandneighbour)
-            frontierSet.add(grandneighbour)
-          }
+          frontier.push(grandneighbour)
         }
       }
     }
@@ -281,6 +320,188 @@ function trivialSolveTile(game, tile, frontier, frontierSet) {
   }
   return false
 }
+
+// Slightly complex, this 
+function getBinds(game, tile) {
+  let minesLeft = parseInt(tile.value)
+  let closedTiles = []
+  for (let neighbour of neighbours(game.board, tile)) {
+    if (neighbour.marked) {
+      minesLeft -= 1
+    } else if (!neighbour.open) {
+      closedTiles.push(neighbour)
+    }
+  }
+  let binds = []
+  if (closedTiles.length === 2) {
+    for (let neighbour of neighbours(game.board, closedTiles[0])) {
+      if (areNeighbours(neighbour, closedTiles[1]) && 
+          neighbour !== tile && neighbour.open) {
+        let bind = {}
+        bind.low = tile
+        bind.lowMines = minesLeft
+        bind.high = neighbour
+        bind.highMines = parseInt(neighbour.value)
+        bind.joint = closedTiles
+        bind.seperate = []
+        for (let grandneighbour of neighbours(game.board, neighbour)) {
+          if (grandneighbour.marked) {
+            bind.highMines -= 1
+          }
+          if (closedTiles.indexOf(grandneighbour) === -1 && !grandneighbour.open && !grandneighbour.marked) {
+            bind.seperate.push(grandneighbour)
+          }
+        }
+        if (bind.seperate.length > 0) {
+          binds.push(bind)
+        }
+      }
+    }
+  }
+  // repeated because I am feeling lazy
+  if (closedTiles.length === 3) {
+    for (let neighbour of neighbours(game.board, closedTiles[0])) {
+      if (areNeighbours(neighbour, closedTiles[1]) && 
+          areNeighbours(neighbour, closedTiles[2]) &&
+          neighbour !== tile && neighbour.open) {
+        let bind = {}
+        bind.low = tile
+        bind.lowMines = minesLeft
+        bind.high = neighbour
+        bind.highMines = parseInt(neighbour.value)
+        bind.joint = closedTiles
+        bind.seperate = []
+        for (let grandneighbour of neighbours(game.board, neighbour)) {
+          if (grandneighbour.marked) {
+            bind.highMines -= 1
+          }
+          if (closedTiles.indexOf(grandneighbour) === -1 && !grandneighbour.open && !grandneighbour.marked) {
+            bind.seperate.push(grandneighbour)
+          }
+        }
+        if (bind.seperate.length > 0) {
+          binds.push(bind)
+        }
+      }
+    }
+  }
+  return binds
+}
+
+function dominationSolver(game, tile, frontier) {
+  let discovered = false
+  for (let bind of getBinds(game, tile)) {
+    if (bind.lowMines === bind.highMines) {
+      for (let neighbour of bind.seperate) {
+        clickTile(game, neighbour, false)
+        discovered = true
+        frontier.push(neighbour)
+        for (let grandneighbour of neighbours(game.board, neighbour)) {
+          frontier.push(grandneighbour)
+        }
+      }
+    }
+  }
+  return discovered
+}
+
+function avoidanceSolver(game, tile, frontier) {
+  let discovered = false
+  for (let bind of getBinds(game, tile)) {
+    if (bind.lowMines + bind.seperate.length === bind.highMines) {
+      for (let neighbour of bind.seperate) {
+        markTile(game, neighbour, false)
+        discovered = true
+        for (let grandneighbour of neighbours(game.board, neighbour)) {
+          frontier.push(grandneighbour)
+        }
+      }
+    }
+  }
+  return discovered
+}
+
+function supplySolver(game, tile, frontier) {
+  if (game.minesLeft === 0) {
+    for (let tile of allTiles(game.board)) {
+      if (!tile.marked && !tile.open) {
+        clickTile(game, tile, false)
+      }
+    }
+  }
+  return true
+}
+
+class Frontier {
+  constructor(board) {
+    this.board = board
+    this.frontier = []
+    for (let tile of allTiles(board)) {
+      if (this.frontierTile(board, tile)) {
+        this.frontier.push(tile)
+      }
+    }
+    this.frontierSet = new Set(this.frontier)
+  }
+
+  frontierTile(board, tile) {
+    if (tile.open && tile.value in '123456789'.split('')) {
+      let closedNeighbours = 0
+      for (let neighbour of neighbours(board, tile)) {
+        if (!neighbour.open && !neighbour.marked) {
+          closedNeighbours += 1
+        }
+      }
+      return closedNeighbours > 0
+    }
+    return false
+  }
+
+  push(tile) {
+    if (!this.frontierSet.has(tile)) {
+      this.frontier.push(tile)
+      this.frontierSet.add(tile)
+    }
+  }
+
+  pop() {
+    let tile = this.frontier.pop()
+    this.frontierSet.delete(tile)
+    return tile
+  }
+
+  isEmpty() {
+    return this.frontier.length === 0
+  }
+
+}
+
+class MultiFrontier {
+  constructor(board, functions) {
+    this.board = board
+    this.functions = functions
+    this.frontiers = []
+    for (let _ of functions) {
+      this.frontiers.push(new Frontier(board))
+    }
+  }
+
+  push(tile) {
+    for (let frontier of this.frontiers) {
+      frontier.push(tile)
+    }
+  }
+
+  pop(frontier) {
+    return this.frontiers[frontier].pop()
+  }
+
+  get(frontier) {
+    return this.frontiers[frontier]
+  }
+
+}
+
 
 </script>
 
@@ -304,10 +525,10 @@ function trivialSolveTile(game, tile, frontier, frontierSet) {
     </div>
   </div>
   <h4 id="minesweeper-mines-left-display">Mines Left: {{ mainGame.minesLeft }}</h4>
-  <button v-on:click="resetGameBeginner(mainGame)" id="minesweeper-new-game-button">New Beginner Game</button>
-  <button v-on:click="resetGameIntermediate(mainGame)" id="minesweeper-new-game-button">New Intermediate Game</button>
-  <button v-on:click="resetGameExpert(mainGame)" id="minesweeper-new-game-button">New Expert Game</button>
-  <button v-on:click="runSolverTests(mainGame)" id="minesweeper-new-game-button">Autosolve (For Dev Use)</button>
+  <button v-on:click="resetGame(mainGame, 9, 9, 10, smartSetupBeginner)" id="minesweeper-new-game-button">New Beginner Game</button>
+  <button v-on:click="resetGame(mainGame, 16, 16, 40, smartSetupIntermediate)" id="minesweeper-new-game-button">New Intermediate Game</button>
+  <button v-on:click="resetGame(mainGame, 30, 16, 99, setupBoard)" id="minesweeper-new-game-button">New Expert Game</button>
+  <!-- button v-on:click="runSolverTests(mainGame)" id="minesweeper-new-game-button">Autosolve (For Dev Use)</button -->
   <h2 v-if="mainGame.state === 'won'">You Won! B)</h2>
   <h2 v-if="mainGame.state === 'lost'">You Lost :(</h2>
 </template>
