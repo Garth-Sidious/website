@@ -2,25 +2,33 @@
 import { reactive } from 'vue'
 
 // Game states: setup (board displayed but not filled with mines), playing, won, lost
-let width = 9
-let height = 9
-let mineCount = 10 //Sanity check for mine count
-let game = reactive({})
-resetGame()
+let mainGame = reactive({})
+resetGameBeginner(mainGame)
 
-// Gets the 8 (or sometimes less) neighbours of a tile, given the coordinates of the tile and a board.
-function neighbours(board, x, y) {
-  let result = []
+// Gets the 8 (or sometimes less) neighbours of a tile, given a board and a tile.
+function neighbours(board, tile) {
+  let tiles = []
   for (let k of [-1, 0, 1]) {
     for (let l of [-1, 0, 1]) {
-      if (board[x + k] !== undefined && 
-          board[x + k][y + l] !== undefined && 
+      if (board[tile.x + k] !== undefined && 
+          board[tile.x + k][tile.y + l] !== undefined && 
           (k !== 0 || l !== 0)) {
-        result.push(board[x + k][y + l])
+        tiles.push(board[tile.x + k][tile.y + l])
       }
     }
   }
-  return result
+  return tiles
+}
+
+// Gets every tile on a board
+function allTiles(board) {
+  let tiles = []
+  for (let row of board) {
+    for (let tile of row) {
+      tiles.push(tile)
+    }
+  }
+  return tiles
 }
 
 // Create a blank minesweeper board, for setup use.
@@ -37,61 +45,57 @@ function blankBoard(width, height) {
   return board
 }
 
-// Set up a minesweeper board with a width, height, and a number of mines.
-// Also takes a click position x, y. This square or its neighbours cannot be mines.
-// Mines should not be more than width * height.
-function setupBoard(width, height, mines, x, y) {
-  // Create board
-  let board = blankBoard(width, height)
+// Set up a minesweeper board with a blank board, width, height, and a number of mines.
+// Also takes a clicked tile. This tile or its neighbours cannot be mines.
+function setupBoard(board, width, height, mines, clickedTile) {
   // Add mines
   for (let m = 0; m < mines; m++) {
     let i = Math.floor(Math.random() * height)
     let j = Math.floor(Math.random() * width)
-    while (board[i][j].value === "M" || (Math.abs(x - i) <= 1 && Math.abs(y - j) <= 1)) {
+    while (board[i][j].value === "M" || (Math.abs(clickedTile.x - i) <= 1 && Math.abs(clickedTile.y - j) <= 1)) {
       i = Math.floor(Math.random() * height)
       j = Math.floor(Math.random() * width)
     }
     board[i][j].value = "M"
   }
   // Add numbers
-  for (let i = 0; i < height; i++) {
-    for (let j = 0; j < width; j++) {
-      if (board[i][j].value !== "M") {
-        let mines = 0
-        for (let neighbour of neighbours(board, i, j)) {
-          if (neighbour.value === 'M') {
-            mines += 1
-          }
+  for (let tile of allTiles(board)) {
+    if (tile.value !== "M") {
+      let mines = 0
+      for (let neighbour of neighbours(board, tile)) {
+        if (neighbour.value === 'M') {
+          mines += 1
         }
-        // If mines is 0, leave the tile blank
-        if (mines > 0) {
-          board[i][j].value = mines.toString()
-        }
+      }
+      // If mines is 0, leave the tile blank
+      if (mines > 0) {
+        tile.value = mines.toString()
       }
     }
   }
+  console.log(board)
   return board
 }
 
 // Mark a tile on the board as a mine and disable right click events.
-function markTileRightClick(event, x, y) {
-  if (game.board[x][y].open || game.state !== 'playing') {
+function markTileRightClick(event, game, tile) {
+  if (tile.open || game.state !== 'playing') {
     return
   }
   event.preventDefault()
-  markTile(x, y)
+  markTile(game, tile)
 }
 
 // Mark a tile on the board as a mine.
-function markTile(x, y) {
-  if (game.board[x][y].open || game.state !== 'playing') {
+function markTile(game, tile) {
+  if (tile.open || game.state !== 'playing') {
     return
   }
-  if (game.board[x][y].marked) {
-    game.board[x][y].marked = false
+  if (tile.marked) {
+    tile.marked = false
     game.markedTiles -= 1
   } else {
-    game.board[x][y].marked = true
+    tile.marked = true
     game.markedTiles += 1
   }
   game.minesLeft = Math.max(0, game.mines - game.markedTiles)
@@ -99,77 +103,64 @@ function markTile(x, y) {
 
 // Click a tile on the board.
 // If the tile is empty, clicks the 8 tiles around it too.
-function clickTile(x, y) {
+function clickTile(game, tile) {
   if (game.state === 'setup') {
-    game.board = setupBoard(width, height, mineCount, x, y)
+    game.board = setupBoard(game.board, game.width, game.height, game.mines, tile)
     game.state = 'playing'
-    clickTile(x, y)
+  }
+  if (tile.open || tile.marked || game.state !== 'playing') {
     return
   }
-  if (game.board[x][y].open || game.board[x][y].marked || game.state !== 'playing') {
-    return
-  }
-  game.board[x][y].open = true;
+  tile.open = true;
 
-  if (game.board[x][y].value === 'M') {
+  if (tile.value === 'M') {
     // Clicking a mine causes you to lose
-    game.state = 'lost'
-    game.board[x][y].value = 'E' //Exploded
-    for (let i = 0; i < height; i++) {
-      for (let j = 0; j < width; j++) {
-        if (game.board[i][j].value === 'M') {
-          game.board[i][j].open = true
-        }
+    for (let revealTile of allTiles(game.board)) {
+      if (revealTile.value === 'M') {
+        revealTile.open = true
       }
     }
+    game.state = 'lost'
+    tile.value = 'E' //Exploded
     return
   }
 
   game.tilesLeft -= 1
   if (game.tilesLeft === 0) {
     // No tiles left to reveal means a win
-    game.state = 'won'
-    for (let i = 0; i < height; i++) {
-      for (let j = 0; j < width; j++) {
-        if (game.board[i][j].value === 'M') {
-          game.board[i][j].marked = true
-        }
+    for (let revealTile of allTiles(game.board)) {
+      if (revealTile.value === 'M' && !revealTile.marked) {
+        markTile(game, revealTile)
       }
     }
+    game.state = 'won'
     return
   }
 
-  if (game.board[x][y].value === '') {
-    for (let neighbour of neighbours(game.board, x, y)) {
-      clickTile(neighbour.x, neighbour.y)
+  if (tile.value === '') {
+    for (let neighbour of neighbours(game.board, tile)) {
+      clickTile(game, neighbour)
     }
   }
 }
 
-function resetGameBeginner() {
-  width = 9
-  height = 9
-  mineCount = 10
-  resetGame()
+function resetGameBeginner(game) {
+  resetGame(game, 5, 5, 3)
 }
 
-function resetGameIntermediate() {
-  width = 16
-  height = 16
-  mineCount = 40
-  resetGame()
+function resetGameIntermediate(game) {
+  resetGame(game, 16, 16, 40)
 }
 
-function resetGameExpert() {
-  width = 30
-  height = 16
-  mineCount = 99
-  resetGame()
+function resetGameExpert(game) {
+  resetGame(game, 30, 16, 99)
 }
 
-function resetGame() {
+function resetGame(game, width, height, mineCount) {
   game.board = blankBoard(width, height)
-  game.state = 'setup',
+  game.state = 'setup'
+  game.width = width
+  game.height = height
   game.tilesLeft = width * height - mineCount
   game.mines = mineCount
   game.markedTiles = 0;
@@ -177,13 +168,13 @@ function resetGame() {
 }
 
 //Functions for a minesweeper solver implementation, to investigate how hard minesweeper is
-function runSolverTests() {
-  resetGameBeginner()
-  clickTile(4, 4)
+function runSolverTests(game) {
+  resetGameBeginner(game)
+  clickTile(game, game.board[4][4])
   solveBoard(0)
   while (game.state == 'won') {
-    resetGameBeginner()
-    clickTile(4, 4)
+    resetGameBeginner(game)
+    clickTile(game, game.board[4][4])
     solveBoard(0)
   }
 }
@@ -233,7 +224,7 @@ function frontierTile(tile) {
   return false
 }
 
-function trivialSolveTile(tile, depth) {
+function trivialSolveTile(tile) {
   let minesLeft = parseInt(tile.value)
   let closedTiles = 0
   for (let neighbour of neighbours(game.board, tile.x, tile.y)) {
@@ -244,9 +235,6 @@ function trivialSolveTile(tile, depth) {
     }
   }
   if (minesLeft === 0) {
-    if (depth > 990) {
-      console.log('none left on', tile.x, tile.y)
-    }
     for (let neighbour of neighbours(game.board, tile.x, tile.y)) {
       if (!neighbour.marked && !neighbour.open) {
         clickTile(neighbour.x, neighbour.y)
@@ -254,12 +242,9 @@ function trivialSolveTile(tile, depth) {
     }
     return true
   } else if (minesLeft === closedTiles) {
-    if (depth > 990) {
-      console.log('can mark mines on', tile.x, tile.y)
-    }
     for (let neighbour of neighbours(game.board, tile.x, tile.y)) {
       if (!neighbour.marked && !neighbour.open) {
-        markTile(neighbour.x, neighbour.y)
+        markTile(game, neighbour)
       }
     }
     return true
@@ -276,25 +261,25 @@ function trivialSolveTile(tile, depth) {
   </div>
   <h1 id="minesweeper-header">Minesweeper</h1>
   <div id="minesweeper-container">
-    <div v-for="row in game.board" class="minesweeper-row">
-      <button v-for="item in row" class="minesweeper-button" 
-        :class="[{ active: item.open }, { inactive: !item.open }, 'm' + item.value]"
-        :disabled=item.open
-        v-on:contextmenu="markTileRightClick($event, item.x, item.y)"
-        v-on:click="clickTile(item.x, item.y)" >
-        <img class="minesweeper-flag" v-if="!item.open && item.marked" src="@/assets/flag.svg">
-        <img class="minesweeper-bomb" v-if="item.open && (item.value === 'M' || item.value === 'E')" src="@/assets/bomb.svg">
-        <span v-if="item.open && item.value !== 'M'" class="minesweeper-button-text" :class="['m' + item.value]">{{ item.value }}</span>
+    <div v-for="row in mainGame.board" class="minesweeper-row">
+      <button v-for="tile in row" class="minesweeper-button" 
+        :class="[{ active: tile.open }, { inactive: !tile.open }, 'm' + tile.value]"
+        :disabled=tile.open
+        v-on:contextmenu="markTileRightClick($event, mainGame, tile)"
+        v-on:click="clickTile(mainGame, tile)" >
+        <img class="minesweeper-flag" v-if="!tile.open && tile.marked" src="@/assets/flag.svg">
+        <img class="minesweeper-bomb" v-if="tile.open && (tile.value === 'M' || tile.value === 'E')" src="@/assets/bomb.svg">
+        <span v-if="tile.open && tile.value !== 'M' && tile.value !== 'E'" class="minesweeper-button-text" :class="['m' + tile.value]">{{ tile.value }}</span>
       </button>
     </div>
   </div>
-  <h4 id="minesweeper-mines-left-display">Mines Left: {{ game.minesLeft }}</h4>
-  <button v-on:click="resetGameBeginner" id="minesweeper-new-game-button">New Beginner Game</button>
-  <button v-on:click="resetGameIntermediate" id="minesweeper-new-game-button">New Intermediate Game</button>
-  <button v-on:click="resetGameExpert" id="minesweeper-new-game-button">New Expert Game</button>
-  <button v-on:click="runSolverTests" id="minesweeper-new-game-button">Autosolve (For Dev Use)</button>
-  <h2 v-if="game.state === 'won'">You Won! B)</h2>
-  <h2 v-if="game.state === 'lost'">You Lost :(</h2>
+  <h4 id="minesweeper-mines-left-display">Mines Left: {{ mainGame.minesLeft }}</h4>
+  <button v-on:click="resetGameBeginner(mainGame)" id="minesweeper-new-game-button">New Beginner Game</button>
+  <button v-on:click="resetGameIntermediate(mainGame)" id="minesweeper-new-game-button">New Intermediate Game</button>
+  <button v-on:click="resetGameExpert(mainGame)" id="minesweeper-new-game-button">New Expert Game</button>
+  <button v-on:click="runSolverTests(mainGame)" id="minesweeper-new-game-button">Autosolve (For Dev Use)</button>
+  <h2 v-if="mainGame.state === 'won'">You Won! B)</h2>
+  <h2 v-if="mainGame.state === 'lost'">You Lost :(</h2>
 </template>
 
 <style scoped>
