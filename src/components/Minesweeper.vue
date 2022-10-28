@@ -3,7 +3,7 @@ import { reactive } from 'vue'
 
 // Game states: setup (board displayed but not filled with mines), playing, won, lost
 let mainGame = reactive({})
-resetGame(mainGame, 9, 9, 10, setupBoard)
+resetGame(mainGame, 9, 9, 10, smartSetupBeginner)
 
 // Gets the 8 (or sometimes less) neighbours of a tile, given a board and a tile.
 function neighbours(board, tile) {
@@ -20,8 +20,19 @@ function neighbours(board, tile) {
   return tiles
 }
 
-function areNeighbours(a, b) {
-  return Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1
+// Get the 24 (or sometimes less) neighbours of neighbours of a tile.
+function grandneighbours(board, tile) {
+  let tiles = []
+  for (let k of [-2, -1, 0, 1, 2]) {
+    for (let l of [-2, -1, 0, 1, 2]) {
+      if (board[tile.x + k] !== undefined && 
+          board[tile.x + k][tile.y + l] !== undefined && 
+          (k !== 0 || l !== 0)) {
+        tiles.push(board[tile.x + k][tile.y + l])
+      }
+    }
+  }
+  return tiles
 }
 
 // Gets every tile on a board
@@ -174,6 +185,68 @@ function resetGameStatic(game) {
   game.minesLeft = game.mines
 }
 
+//Create a game from a mintuare representation, for use in testing (and possibly other things?).
+//Format for mini is an array of mines M, marked mines X, closed tiles C, and open tiles O.
+function miniToGame(mini, game) {
+  game.state = 'playing'
+  game.width = mini.length
+  game.height = mini[0].length
+  game.board = blankBoard(game.width, game.height)
+  let mineCount = 0
+  for (let tile of allTiles(game.board)) {
+    let miniTile = mini[tile.y][tile.x]
+    if (miniTile === 'M' || miniTile === 'X') {
+      tile.value = 'M'
+      mineCount += 1
+    }
+    if (miniTile === 'X') {
+      tile.marked = true
+    }
+    if (miniTile === 'O') {
+      tile.open = true
+    }
+  }
+  for (let tile of allTiles(game.board)) {
+    if (tile.value !== "M") {
+      let mines = 0
+      for (let neighbour of neighbours(game.board, tile)) {
+        if (neighbour.value === 'M') {
+          mines += 1
+        }
+      }
+      if (mines > 0) {
+        tile.value = mines.toString()
+      }
+    }
+  }
+  game.mines = mineCount
+  game.tilesLeft = game.width * game.height - game.mines
+  game.markedTiles = 0
+  game.minesLeft = game.mines
+}
+
+//Create a mini from a gamr, for use in testing (and possibly other things?).
+//Format for mini is an array of mines M, marked mines X, closed tiles C, and open tiles O.
+function gameToMini(game) {
+  let mini = Array(game.height).fill().map(() => Array(game.width).fill(0));
+  for (let tile of allTiles(game.board)) {
+    if (tile.value === 'M') {
+      if (tile.marked === true) {
+        mini[tile.y][tile.x] = 'X'
+      } else {
+        mini[tile.y][tile.x] = 'M'
+      }
+    } else {
+      if (tile.open === true) {
+        mini[tile.y][tile.x] = 'O'
+      } else {
+        mini[tile.y][tile.x] = 'C'
+      }
+    }
+  }
+  return mini
+}
+
 //Functions for a minesweeper solver implementation, to investigate how hard minesweeper is
 //Also for use in always generating solvable boards.
 function smartSetupBeginner(game, clickedTile) {
@@ -196,21 +269,20 @@ function smartSetupIntermediate(game, clickedTile) {
   let testGame = {}
   resetGame(testGame, 16, 16, 40, setupBoard)
   clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
-  solveGameBeginner(testGame)
-  let solvedBeginner = testGame.state === 'won'
-  resetGameStatic(testGame)
-  clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
-  solveGameIntermediate(testGame)
-  let solvedIntermediate = testGame.state === 'won'
-  while (solvedBeginner || !solvedIntermediate) {
+  let usage = solveGameIntermediate(testGame)
+  let weightedUsage = 0
+  if (usage) {
+    weightedUsage = ((usage[1] + 1) * (usage[2] + 1) * (usage[3] + 1))
+  }
+  while (weightedUsage <= 2) {
+    console.log(weightedUsage)
     resetGame(testGame, 16, 16, 40, setupBoard)
     clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
-    solveGameBeginner(testGame)
-    solvedBeginner = testGame.state === 'won'
-    resetGameStatic(testGame)
-    clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
-    solveGameIntermediate(testGame)
-    solvedIntermediate = testGame.state === 'won'
+    usage = solveGameIntermediate(testGame)
+    weightedUsage = 0
+    if (usage) {
+      weightedUsage = ((usage[1] + 1) * (usage[2] + 1) * (usage[3] + 1))
+    }
   }
   resetBoard(testGame.board)
   for (let tile of allTiles(testGame.board)) {
@@ -218,38 +290,39 @@ function smartSetupIntermediate(game, clickedTile) {
   }
 }
 
+// Run a set of unit tests to make sure the various solvers work as intended
+function runUnitTests(game) {
+  miniToGame([
+  'MMM', 
+  'MCM', 
+  'MMM'], game)
+  solveGameBeginner(game)
+  console.log(gameToMini(game))
+}
+
 function runSolverTests(game) {
-  let count = 1000
-  let solved = 0
-  let downgrades = 0
-  let improvements = 0
-  let unsolved = 0
+  let count = 10
+  let usages = []
+  let testGame = {} 
   for (let i = 0; i < count; i++) {
-    resetGame(game, 30, 16, 99, setupBoard)
-    clickTile(game, game.board[4][4])
-    solveGameBeginner(game)
-    let solvedBeginner = game.state === 'won'
-    resetGameStatic(game)
-    clickTile(game, game.board[4][4])
-    solveGameIntermediate(game)
-    let solvedIntermediate = game.state === 'won'
-    if (solvedBeginner && solvedIntermediate) {
-      solved += 1
+    resetGame(testGame, 16, 16, 40, setupBoard)
+    clickTile(testGame, testGame.board[4][4])
+    let usage = solveGameIntermediate(testGame)
+    if (testGame.state === 'lost') {
+      print('lmao')
     }
-    if (solvedBeginner && !solvedIntermediate) {
-      downgrades += 1
-    }
-    if (!solvedBeginner && solvedIntermediate) {
-      improvements += 1
-    }
-    if (!solvedBeginner && !solvedIntermediate) {
-      unsolved += 1
+    if (usage) {
+      usages.push((usage[1] + 1) * (usage[2] + 1) * (usage[3] + 1))
     }
   }
-  console.log('solved: ', solved)
-  console.log('downgrades: ', downgrades)
-  console.log('improvements: ', improvements)
-  console.log('unsolved: ', unsolved)
+  resetGame(game, 16, 16, 40, setupBoard)
+  game.board = testGame.board
+  game.tilesLeft = testGame.tilesLeft
+  game.markedTiles = testGame.markedTiles
+  game.minesLeft = testGame.minesLeft
+  game.state = testGame.state
+  usages.sort((a, b) => a - b)
+  console.log(usages)
 }
 
 //Solve a game board with beginner strategies.
@@ -266,18 +339,25 @@ function solveGameIntermediate(game, cycleTracker=[0]) {
   let functions = [trivialSolver, dominationSolver, avoidanceSolver, supplySolver]
   let frontiers = new MultiFrontier(game.board, functions)
   let frontier = 0
+  let usageTracker = [0, 0, 0, 0]
   while (frontier < functions.length) {
     while (!frontiers.get(frontier).isEmpty()) {
+      if (cycleTracker[cycleTracker.length - 1] >= 100000) {
+        console.log('THE BIG BAD')
+        return
+      }
       cycleTracker[cycleTracker.length - 1] += 1
-      if (functions[frontier](game, frontiers.pop(frontier), frontiers)) {
+      if (functions[frontier](game, frontiers.pop(frontier), frontiers, cycleTracker[cycleTracker.length - 1])) {
+        usageTracker[frontier] += 1
         frontier = 0
         if (game.state === 'won') {
-          return
+          return usageTracker
         }
       }
     }
     frontier += 1
   }
+  return
 }
 
 // Solves a specific tile of a minesweeper game with trivial methods.
@@ -333,53 +413,31 @@ function getBinds(game, tile) {
     }
   }
   let binds = []
-  if (closedTiles.length === 2) {
-    for (let neighbour of neighbours(game.board, closedTiles[0])) {
-      if (areNeighbours(neighbour, closedTiles[1]) && 
-          neighbour !== tile && neighbour.open) {
+  if (closedTiles.length > 1) {
+    for (let neighbour of grandneighbours(game.board, tile)) {
+      if (neighbour.open) {
         let bind = {}
-        bind.low = tile
-        bind.lowMines = minesLeft
-        bind.high = neighbour
-        bind.highMines = parseInt(neighbour.value)
-        bind.joint = closedTiles
-        bind.seperate = []
+        bind.self = tile
+        bind.selfMines = minesLeft
+        bind.selfTiles = [...closedTiles]
+        bind.bind = neighbour
+        bind.bindMines = parseInt(neighbour.value)
+        bind.bindTiles = []
+        bind.joint = []
         for (let grandneighbour of neighbours(game.board, neighbour)) {
           if (grandneighbour.marked) {
-            bind.highMines -= 1
+            bind.bindMines -= 1
           }
-          if (closedTiles.indexOf(grandneighbour) === -1 && !grandneighbour.open && !grandneighbour.marked) {
-            bind.seperate.push(grandneighbour)
-          }
-        }
-        if (bind.seperate.length > 0) {
-          binds.push(bind)
-        }
-      }
-    }
-  }
-  // repeated because I am feeling lazy
-  if (closedTiles.length === 3) {
-    for (let neighbour of neighbours(game.board, closedTiles[0])) {
-      if (areNeighbours(neighbour, closedTiles[1]) && 
-          areNeighbours(neighbour, closedTiles[2]) &&
-          neighbour !== tile && neighbour.open) {
-        let bind = {}
-        bind.low = tile
-        bind.lowMines = minesLeft
-        bind.high = neighbour
-        bind.highMines = parseInt(neighbour.value)
-        bind.joint = closedTiles
-        bind.seperate = []
-        for (let grandneighbour of neighbours(game.board, neighbour)) {
-          if (grandneighbour.marked) {
-            bind.highMines -= 1
-          }
-          if (closedTiles.indexOf(grandneighbour) === -1 && !grandneighbour.open && !grandneighbour.marked) {
-            bind.seperate.push(grandneighbour)
+          if (!grandneighbour.open && !grandneighbour.marked) {
+            if (closedTiles.indexOf(grandneighbour) === -1) {
+              bind.bindTiles.push(grandneighbour)
+            } else {
+              bind.joint.push(grandneighbour)
+              bind.selfTiles.splice(bind.selfTiles.indexOf(grandneighbour), 1);
+            }
           }
         }
-        if (bind.seperate.length > 0) {
+        if (bind.joint.length > 0) {
           binds.push(bind)
         }
       }
@@ -391,8 +449,8 @@ function getBinds(game, tile) {
 function dominationSolver(game, tile, frontier) {
   let discovered = false
   for (let bind of getBinds(game, tile)) {
-    if (bind.lowMines === bind.highMines) {
-      for (let neighbour of bind.seperate) {
+    if (bind.selfMines === bind.bindMines && bind.selfTiles === 0) {
+      for (let neighbour of bind.bindTiles) {
         clickTile(game, neighbour, false)
         discovered = true
         frontier.push(neighbour)
@@ -405,12 +463,25 @@ function dominationSolver(game, tile, frontier) {
   return discovered
 }
 
-function avoidanceSolver(game, tile, frontier) {
+function avoidanceSolver(game, tile, frontier, depth) {
   let discovered = false
   for (let bind of getBinds(game, tile)) {
-    if (bind.lowMines + bind.seperate.length === bind.highMines) {
-      for (let neighbour of bind.seperate) {
-        markTile(game, neighbour, false)
+    if (bind.bindMines + bind.selfTiles.length === bind.selfMines) {
+      for (let neighbour of bind.selfTiles) {
+        if (!neighbour.marked) {
+          markTile(game, neighbour, false)
+        }
+        discovered = true
+        for (let grandneighbour of neighbours(game.board, neighbour)) {
+          frontier.push(grandneighbour)
+        }
+      }
+    }
+    if (bind.selfMines + bind.bindTiles.length === bind.bindMines) {
+      for (let neighbour of bind.bindTiles) {
+        if (!neighbour.marked) {
+          markTile(game, neighbour, false)
+        }
         discovered = true
         for (let grandneighbour of neighbours(game.board, neighbour)) {
           frontier.push(grandneighbour)
@@ -528,7 +599,7 @@ class MultiFrontier {
   <button v-on:click="resetGame(mainGame, 9, 9, 10, smartSetupBeginner)" id="minesweeper-new-game-button">New Beginner Game</button>
   <button v-on:click="resetGame(mainGame, 16, 16, 40, smartSetupIntermediate)" id="minesweeper-new-game-button">New Intermediate Game</button>
   <button v-on:click="resetGame(mainGame, 30, 16, 99, setupBoard)" id="minesweeper-new-game-button">New Expert Game</button>
-  <!-- button v-on:click="runSolverTests(mainGame)" id="minesweeper-new-game-button">Autosolve (For Dev Use)</button -->
+  <button v-on:click="runUnitTests(mainGame)" id="minesweeper-new-game-button">Autosolve (For Dev Use)</button>
   <h2 v-if="mainGame.state === 'won'">You Won! B)</h2>
   <h2 v-if="mainGame.state === 'lost'">You Lost :(</h2>
 </template>
