@@ -1,5 +1,5 @@
 <script setup>
-import { reactive } from 'vue'
+import { reactive, toRaw } from 'vue'
 
 // Game states: setup (board displayed but not filled with mines), playing, won, lost
 let mainGame = reactive({})
@@ -329,7 +329,9 @@ function runUnitTests(game) {
   runUnitTest(game, solveGameExpert, ["CMC", "MCC", "CCO"], ["OXO", "XOO", "OOO"]) // double bind
   runUnitTest(game, solveGameExpert, ["MMCC", "MOOX", "COXX", "CXXX"], ["XXOO", "XOOX", "OOXX", "OXXX"]) // double bind
 
-  runAllTests(game, solveGameExpert, 3, 3, 0, 0)
+  runAllTests(game, solveGameExpert, 3, 4, 0, 0)
+
+  runUnitTest(game, solveGameExpert, ["CCC", "CCM", "CMC", "CCC"], [])
 }
 
 // Run a single unit test to make sure the various solvers work as intended
@@ -388,7 +390,7 @@ function runAllTests(game, solver, width, height, clickX, clickY) {
       console.log(mini)
     }
     if (game.state === 'playing') {
-      if (gameIsPossible(game)) {
+      if (gameProgressIsPossible(game)) {
         console.log("possible")
         console.log(mini)
       }
@@ -396,8 +398,114 @@ function runAllTests(game, solver, width, height, clickX, clickY) {
   }
 }
 
-function gameIsPossible(game) {
-  return false
+// Checks if a game state could have been progressed with better play.
+function gameProgressIsPossible(game) {
+  const micro = gameToMicro(game)
+  const possibilites = microPossibilities(micro, game.minesLeft, game.width)
+  let truth = possibilites[0]
+  for (const possibility of possibilites) {
+    for (let i = 0; i < possibility.length; i++) {
+      if (possibility[i] !== truth[i]) {
+        truth = truth.substring(0, i) + '?' + truth.substring(i + 1)
+      }
+    }
+  }
+  return truth.includes('M') || truth.includes('C')
+}
+
+function gameToMicro(game) {
+  let micro = ''
+  for (let tile of allTiles(game.board)) {
+    if (tile.value === 'M') {
+      if (tile.marked === true) {
+        micro +='X'
+      } else {
+        micro += 'C'
+      }
+    } else {
+      if (tile.open === true) {
+        if (tile.value === '') {
+          micro += '0'
+        } else {
+          micro += tile.value
+        }
+      } else {
+        micro += 'C'
+      }
+    }
+  }
+  return micro
+}
+
+function microPossibilities(micro, minesLeft, width) {
+  let minC = micro.indexOf('C')
+  if (minC === -1) {
+    return [micro]
+  } else if (minesLeft === 0) {
+    micro = micro.replaceAll('C', '.')
+    if (validMicro(micro, width)) {
+      return [micro]
+    } else {
+      return []
+    }
+  } else if (minesLeft === (micro.match(/C/g)||[]).length) {
+    micro = micro.replaceAll('C', 'M')
+    if (validMicro(micro, width)) {
+      return [micro]
+    } else {
+      return []
+    }
+  } else {
+    let result = []
+    let a = micro.replace('C', '.')
+    let b = micro.replace('C', 'M')
+    if (validMicro(a, width)) {
+      result = result.concat(microPossibilities(a, minesLeft, width))
+    }
+    if (validMicro(b, width)) {
+      result = result.concat(microPossibilities(b, minesLeft - 1, width))
+    }
+    return result
+  }
+}
+
+function validMicro(micro, width) {
+  for (let i = 0; i < micro.length; i += 1) {
+    if (micro[i] in '012345678'.split('')) {
+      let minMines = 0
+      let maxMines = 0
+      for (let neighbour of microNeighbours(micro, i, width)) {
+        if (neighbour === 'X' || neighbour === 'M') {
+          minMines += 1
+          maxMines += 1
+        }
+        if (neighbour === 'C') {
+          maxMines += 1
+        }
+      }
+      if (parseInt(micro[i]) > maxMines || parseInt(micro[i]) < minMines) {
+        return false
+      }
+    }
+  }
+  return true
+}
+
+function microNeighbours(micro, tile, width) {
+  let result = []
+  let shifts = [-width, width]
+  if (tile % width !== 0) {
+    shifts = shifts.concat([-width - 1, -1, width - 1])
+  }
+  if (tile % width !== width - 1) {
+    shifts = shifts.concat([-width + 1, 1, width + 1])
+  }
+  for (let shift of shifts) {
+    if (micro[tile + shift] !== undefined) {
+      result.push(micro[tile + shift])
+    }
+  }
+  return result
 }
 
 function runSolverTests(game) {
