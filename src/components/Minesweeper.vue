@@ -329,9 +329,25 @@ function runUnitTests(game) {
   runUnitTest(game, solveGameExpert, ["CMC", "MCC", "CCO"], ["OXO", "XOO", "OOO"]) // double bind
   runUnitTest(game, solveGameExpert, ["MMCC", "MOOX", "COXX", "CXXX"], ["XXOO", "XOOX", "OOXX", "OXXX"]) // double bind
 
-  runAllTests(game, solveGameExpert, 3, 4, 0, 0)
+  runUnitTest(game, solveGameExpert, ["OCM", "CCM", "CMC", "CCC"], ["OOX", "OOX", "OXO", "OOO"])
+  runUnitTest(game, solveGameExpert, ["OCM", "CCC", "MCC", "MMC"], ["OOX", "OOO", "XOO", "XMC"])
+  runUnitTest(game, solveGameExpert, ["OCM", "CCC", "CCM", "MMM"], ["OOX", "OOO", "OOX", "XXX"])
 
-  runUnitTest(game, solveGameExpert, ["CCC", "CCM", "CMC", "CCC"], [])
+  // weird triple bind board overlap nightmare
+  //runUnitTest(game, solveGameExpert, ["OCCMM", "CCCCM", "MCMCC", "MCCCC"], ["OOX", "OOO", "OOX", "XXX"])
+  // weird double overlap board thing
+  //runUnitTest(game, solveGameExpert, ["OCCMM", "CCCMM", "MCMCC", "MCCCC"], ["OOX", "OOO", "OOX", "XXX"])
+  // another board triple
+  //runUnitTest(game, solveGameExpert, ["OCCMM", "CCCCM", "MCCCC", "CMCCC"], ["OOX", "OOO", "OOX", "XXX"])
+  // board d-overlap
+  //runUnitTest(game, solveGameExpert, ["OCCMM", "CCCMM", "MCCCC", "CMCCC"], ["OOX", "OOO", "OOX", "XXX"])
+  // different type of board t-overlap
+  //runUnitTest(game, solveGameExpert, ["OCCMM", "CCCCM", "MMCCC", "CMCCC"], ["OOX", "OOO", "OOX", "XXX"])
+  // regular double bind with overlap?
+  //runUnitTest(game, solveGameExpert, ["OCMCC", "CCCCM", "CCCCM", "MMMCC"], ["OOX", "OOO", "OOX", "XXX"])
+
+  //let testGame = {}
+  //runAllTests(testGame, solveGameExpert, 5, 4, 0, 0)
 }
 
 // Run a single unit test to make sure the various solvers work as intended
@@ -381,7 +397,13 @@ function allMinis(width, height, clickX, clickY) {
 
 // Run all unit tests on a specific board size to check if a solver is flawless for that board size
 function runAllTests(game, solver, width, height, clickX, clickY) {
+  let count = 0
+  let badMinis = []
   for (let mini of allMinis(width, height, clickX, clickY)) {
+    count += 1
+    if (count % 1000 === 0) {
+      console.log(count)
+    }
     miniToGame(mini, game)
     clickTile(game, game.board[clickX][clickY])
     solver(game)
@@ -391,17 +413,30 @@ function runAllTests(game, solver, width, height, clickX, clickY) {
     }
     if (game.state === 'playing') {
       if (gameProgressIsPossible(game)) {
-        console.log("possible")
-        console.log(mini)
+        if (!miniIdenticalToOpenMini(gameToMini(game).join('').replaceAll('M', '.').replaceAll('C', '.'), badMinis)) {
+          console.log("possible")
+          console.log(mini)
+          badMinis.push(gameToMini(game).join('').replaceAll('M', '.').replaceAll('C', '.'))
+        }
       }
     }
   }
 }
 
+function miniIdenticalToOpenMini(mini, badMinis) {
+  for (let badMini of badMinis) {
+    if (mini === badMini) {
+      return true
+    }
+  }
+  return false
+}
+
 // Checks if a game state could have been progressed with better play.
 function gameProgressIsPossible(game) {
   const micro = gameToMicro(game)
-  const possibilites = microPossibilities(micro, game.minesLeft, game.width)
+  const hiddenTiles = (micro.match(/\*/g) || []).length
+  const possibilites = microPossibilities(micro, hiddenTiles, game.minesLeft, game.width)
   let truth = possibilites[0]
   for (const possibility of possibilites) {
     for (let i = 0; i < possibility.length; i++) {
@@ -430,14 +465,24 @@ function gameToMicro(game) {
           micro += tile.value
         }
       } else {
-        micro += 'C'
+        let frontier = false
+        for (let neighbour of neighbours(game.board, tile)) {
+          if (neighbour.open) {
+            frontier = true
+          }
+        }
+        if (frontier) {
+          micro += 'C'
+        } else {
+          micro += '*'
+        }
       }
     }
   }
   return micro
 }
 
-function microPossibilities(micro, minesLeft, width) {
+function microPossibilities(micro, hiddenTiles, minesLeft, width) {
   let minC = micro.indexOf('C')
   if (minC === -1) {
     return [micro]
@@ -448,7 +493,7 @@ function microPossibilities(micro, minesLeft, width) {
     } else {
       return []
     }
-  } else if (minesLeft === (micro.match(/C/g)||[]).length) {
+  } else if (minesLeft === (micro.match(/C/g)||[]).length + hiddenTiles) {
     micro = micro.replaceAll('C', 'M')
     if (validMicro(micro, width)) {
       return [micro]
@@ -460,10 +505,10 @@ function microPossibilities(micro, minesLeft, width) {
     let a = micro.replace('C', '.')
     let b = micro.replace('C', 'M')
     if (validMicro(a, width)) {
-      result = result.concat(microPossibilities(a, minesLeft, width))
+      result = result.concat(microPossibilities(a, hiddenTiles, minesLeft, width))
     }
     if (validMicro(b, width)) {
-      result = result.concat(microPossibilities(b, minesLeft - 1, width))
+      result = result.concat(microPossibilities(b, hiddenTiles, minesLeft - 1, width))
     }
     return result
   }
@@ -510,6 +555,9 @@ function microNeighbours(micro, tile, width) {
 
 function runSolverTests(game) {
   let count = 10000
+  //6536 1764 625 1075 beginner
+  //2441 3541 934 3084 intermediate
+  //6 934 453 8607 expert
   let beginner = 0
   let intermediate = 0
   let expert = 0
@@ -551,7 +599,8 @@ const solveGameBeginner = solveGameCustom([trivialSolver])
 const solveGameIntermediate = solveGameCustom([trivialSolver, dominationSolver, avoidanceSolver, supplySolver])
 
 //Solve a game board with expert strategies.
-const solveGameExpert = solveGameCustom([trivialSolver, dominationSolver, avoidanceSolver, supplySolver, doubleBindSolver])
+const solveGameExpert = solveGameCustom([trivialSolver, dominationSolver, avoidanceSolver, 
+  supplySolver, doubleBindSolver, bindSupplySolver, doubleBindSupplySolver])
 
 //Solve a game board with custom strategies, in order based on the function list.
 function solveGameCustom(functions) {
@@ -561,12 +610,12 @@ function solveGameCustom(functions) {
     let usageTracker = [0, 0, 0, 0]
     while (frontier < functions.length) {
       while (!frontiers.get(frontier).isEmpty()) {
-        if (cycleTracker[cycleTracker.length - 1] >= 100000) {
-          console.log('THE BIG BAD')
+        if (cycleTracker[cycleTracker.length - 1] >= 10000) {
+          console.log('Out of cycles')
           return
         }
         cycleTracker[cycleTracker.length - 1] += 1
-        if (functions[frontier](game, frontiers.pop(frontier), frontiers, cycleTracker[cycleTracker.length - 1])) {
+        if (functions[frontier](game, frontiers, frontiers.pop(frontier))) {
           usageTracker[frontier] += 1
           frontier = 0
           if (game.state === 'won') {
@@ -583,7 +632,7 @@ function solveGameCustom(functions) {
 // Solves a specific tile of a minesweeper game with trivial methods.
 // Specifically, if a tile has no mines left to mark around it, open all other tiles next to it,
 // and if a tile has n closed tiles around it and n mines left, mark all those squares.
-function trivialSolver(game, tile, frontier) {
+function trivialSolver(game, frontier, tile) {
   let minesLeft = parseInt(tile.value)
   if (tile.value == '') {
     minesLeft = 0
@@ -706,7 +755,39 @@ function getDoubleBinds(game, tile) {
   return doubleBinds
 }
 
-function dominationSolver(game, tile, frontier) {
+function getBoardBinds(game) {
+  let binds = []
+  let closedTiles = []
+  for (let tile of allTiles(game.board)) {
+    if (!tile.open && !tile.marked) {
+      closedTiles.push(tile)
+    }
+  }
+  for (let tile of allTiles(game.board)) {
+    if (tile.value !== '' &&  tile.value !== 'M' && !tile.marked && tile.open) {
+      let bind = {}
+      bind.selfTiles = [...closedTiles]
+      bind.bind = tile
+      bind.bindMines = parseInt(tile.value)
+      bind.joint = []
+      for (let neighbour of neighbours(game.board, tile)) {
+        if (neighbour.marked) {
+          bind.bindMines -= 1
+        }
+        if (!neighbour.open && !neighbour.marked) {
+          bind.joint.push(neighbour)
+          bind.selfTiles.splice(bind.selfTiles.indexOf(neighbour), 1);
+        }
+      }
+      if (bind.joint.length > 0) {
+        binds.push(bind)
+      }
+    }
+  }
+  return binds
+}
+
+function dominationSolver(game, frontier, tile) {
   let discovered = false
   for (let bind of getBinds(game, tile)) {
     if (bind.selfMines === bind.bindMines && bind.selfTiles.length === 0) {
@@ -717,7 +798,7 @@ function dominationSolver(game, tile, frontier) {
   return discovered
 }
 
-function avoidanceSolver(game, tile, frontier) {
+function avoidanceSolver(game, frontier, tile) {
   let discovered = false
   for (let bind of getBinds(game, tile)) {
     if (bind.bindMines + bind.selfTiles.length === bind.selfMines) {
@@ -732,8 +813,7 @@ function avoidanceSolver(game, tile, frontier) {
   return discovered
 }
 
-// This solver should be fixed to only be called once in the frontier, so should every other game-scope solver
-function supplySolver(game, tile, frontier) {
+function supplySolver(game, frontier) {
   if (game.minesLeft === 0) {
     for (let tile of allTiles(game.board)) {
       if (!tile.marked && !tile.open) {
@@ -744,7 +824,7 @@ function supplySolver(game, tile, frontier) {
   return true
 }
 
-function doubleBindSolver(game, tile, frontier) {
+function doubleBindSolver(game, frontier, tile) {
   let discovered = false
   for (let bind of getDoubleBinds(game, tile)) {
     if (bind.aMines + bind.bMines + bind.selfTiles.length === bind.selfMines) {
@@ -761,6 +841,64 @@ function doubleBindSolver(game, tile, frontier) {
     }
   }
   return discovered
+}
+
+function bindSupplySolver(game, frontier) {
+  let binds = getBoardBinds(game)
+  for (let bind of binds) {
+    if (bind.bindMines === game.minesLeft) {
+      clickAllAndPushToFrontier(game, bind.selfTiles, frontier)
+      if (bind.selfTiles.length > 0) {
+        return true
+      }
+    }
+    if (bind.selfTiles.length + bind.bindMines === game.minesLeft) {
+      markAllAndPushToFrontier(game, bind.selfTiles, frontier)
+      if (bind.selfTiles.length > 0) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+function doubleBindSupplySolver(game, frontier) {
+  let doubleBinds = []
+  let binds = getBoardBinds(game)
+  for (let i = 0; i < binds.length; i++) {
+    for (let j = 0; j < i; j++) {
+      let fullArray = binds[i].joint.concat(binds[j].joint)
+      let seen = new Set();
+      const hasDuplicates = fullArray.some(function(currentObject) {
+        return seen.size === seen.add(currentObject).size;
+      });
+      if (!hasDuplicates) {
+        let doubleBind = {}
+        doubleBind.selfTiles = binds[i].selfTiles.filter(value => binds[j].selfTiles.includes(value));
+        doubleBind.a = binds[i].bind
+        doubleBind.aMines = binds[i].bindMines
+        doubleBind.aJoint = binds[i].joint
+        doubleBind.b = binds[j].bind
+        doubleBind.bMines = binds[j].bindMines
+        doubleBind.bJoint = binds[j].joint
+        doubleBinds.push(doubleBind)
+      }
+    }
+  }
+  for (let bind of doubleBinds) {
+    if (bind.bMines + bind.aMines === game.minesLeft) {
+      clickAllAndPushToFrontier(game, bind.selfTiles, frontier)
+      if (bind.selfTiles.length > 0) {
+        return true
+      }
+    }
+    if (bind.selfTiles.length + bind.aMines + bind.bMines === game.minesLeft) {
+      markAllAndPushToFrontier(game, bind.selfTiles, frontier)
+      if (bind.selfTiles.length > 0) {
+        return true
+      }
+    }
+  }
 }
 
 function clickAllAndPushToFrontier(game, tiles, frontier) {
@@ -830,13 +968,38 @@ class Frontier {
 
 }
 
+class SingleFrontier {
+  constructor(board) {
+    this.board = board
+    this.active = true
+  }
+
+  push() {
+    this.active = true
+  }
+
+  pop() {
+    this.active = false
+  }
+
+  isEmpty() {
+    return !this.active
+  }
+
+}
+
+
 class MultiFrontier {
   constructor(board, functions) {
     this.board = board
     this.functions = functions
     this.frontiers = []
-    for (let _ of functions) {
-      this.frontiers.push(new Frontier(board))
+    for (let f of functions) {
+      if (f.length === 2) {
+        this.frontiers.push(new SingleFrontier(board))
+      } else {
+        this.frontiers.push(new Frontier(board))
+      }
     }
   }
 
