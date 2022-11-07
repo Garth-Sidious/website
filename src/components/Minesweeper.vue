@@ -333,21 +333,31 @@ function runUnitTests(game) {
   runUnitTest(game, solveGameExpert, ["OCM", "CCC", "MCC", "MMC"], ["OOX", "OOO", "XOO", "XMC"])
   runUnitTest(game, solveGameExpert, ["OCM", "CCC", "CCM", "MMM"], ["OOX", "OOO", "OOX", "XXX"])
 
-  // weird triple bind board overlap nightmare
-  //runUnitTest(game, solveGameExpert, ["OCCMM", "CCCCM", "MCMCC", "MCCCC"], ["OOX", "OOO", "OOX", "XXX"])
-  // weird double overlap board thing
-  //runUnitTest(game, solveGameExpert, ["OCCMM", "CCCMM", "MCMCC", "MCCCC"], ["OOX", "OOO", "OOX", "XXX"])
-  // another board triple
-  //runUnitTest(game, solveGameExpert, ["OCCMM", "CCCCM", "MCCCC", "CMCCC"], ["OOX", "OOO", "OOX", "XXX"])
-  // board d-overlap
-  //runUnitTest(game, solveGameExpert, ["OCCMM", "CCCMM", "MCCCC", "CMCCC"], ["OOX", "OOO", "OOX", "XXX"])
-  // different type of board t-overlap
-  //runUnitTest(game, solveGameExpert, ["OCCMM", "CCCCM", "MMCCC", "CMCCC"], ["OOX", "OOO", "OOX", "XXX"])
-  // regular double bind with overlap?
-  //runUnitTest(game, solveGameExpert, ["OCMCC", "CCCCM", "CCCCM", "MMMCC"], ["OOX", "OOO", "OOX", "XXX"])
+  // overlap double bind board problems
+  runUnitTest(game, solveGameExpert, ["OCCMM", "CCCMM", "MCMCC", "MCCCC"], ["OOOXX", "OOOXX", "XOXOO", "XOOOO"])
+  runUnitTest(game, solveGameExpert, ["OCCCC", "CCCMM", "MCCCC", "MCMCC"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
 
+  // intermediate was having trouble solving this before a fix
+  runUnitTest(game, solveGameIntermediate, ["OCCMM", "CCCCM", "MCMCC", "MCCCC"], ["OOOMM","OOOCM","XOXOC","MCCCC"])
+
+  // triple overlap
+  runUnitTest(game, solveGameExpert, ["OCCMM", "CCCCM", "MMCCC", "CMCCC"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
+  // ??? (awful) (quad overlap???) 
+  //runUnitTest(game, solveGameExpert, ["OCCCM", "CCCMM", "MCCCC", "MMCMC"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
+  // wire
+  //runUnitTest(game, solveGameExpert, ["OCCCC", "CCCCC", "MCCMC", "MMCCM"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
+  // wire
+  //runUnitTest(game, solveGameExpert, ["OCCCM", "CCCCC", "MCCMC", "MMCCM"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
+  // another wire
+  //runUnitTest(game, solveGameExpert, ["OCCCM", "CCCCM", "MCCMC", "MMCCM"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
+
+  // fails 5! unique boards on 5-4-0-0
   //let testGame = {}
   //runAllTests(testGame, solveGameExpert, 5, 4, 0, 0)
+
+  // double board effect demo for users
+  //runUnitTest(game, solveGameCustom([]), ["CCCMM", "CCCCM", "MMCCC", "CMCCC"], [])
+
 }
 
 // Run a single unit test to make sure the various solvers work as intended
@@ -421,6 +431,7 @@ function runAllTests(game, solver, width, height, clickX, clickY) {
       }
     }
   }
+  console.log(badMinis.length)
 }
 
 function miniIdenticalToOpenMini(mini, badMinis) {
@@ -563,12 +574,14 @@ function runSolverTests(game) {
   let expert = 0
   let superExpert = 0
   let testGame = {} 
+  console.time('10k iterations')
   for (let i = 0; i < count; i++) {
-    resetGame(testGame, 30, 16, 99, setupBoard)
+    resetGame(testGame, 16, 16, 40, setupBoard)
     clickTile(testGame, testGame.board[4][4])
-    solveGameBeginner(testGame)
+    solveGameIntermediate(testGame)
     if (testGame.state === 'playing') {
-      solveGameIntermediate(testGame)
+      solveGameCustom([trivialSolver, dominationSolver, avoidanceSolver, 
+  supplySolver, doubleBindSolver, bindSupplySolver, doubleBindSupplySolver])(testGame)
       if (testGame.state === 'playing') {
         solveGameExpert(testGame)
         if (testGame.state === 'playing') {
@@ -583,7 +596,8 @@ function runSolverTests(game) {
       beginner += 1
     }
   }
-  resetGame(game, 30, 16, 99, setupBoard)
+  console.timeEnd('10k iterations')
+  resetGame(game, 16, 16, 40, setupBoard)
   game.board = testGame.board
   game.tilesLeft = testGame.tilesLeft
   game.markedTiles = testGame.markedTiles
@@ -597,10 +611,6 @@ const solveGameBeginner = solveGameCustom([trivialSolver])
 
 //Solve a game board with intermediate strategies.
 const solveGameIntermediate = solveGameCustom([trivialSolver, dominationSolver, avoidanceSolver, supplySolver])
-
-//Solve a game board with expert strategies.
-const solveGameExpert = solveGameCustom([trivialSolver, dominationSolver, avoidanceSolver, 
-  supplySolver, doubleBindSolver, bindSupplySolver, doubleBindSupplySolver])
 
 //Solve a game board with custom strategies, in order based on the function list.
 function solveGameCustom(functions) {
@@ -628,6 +638,12 @@ function solveGameCustom(functions) {
     return
   }
 }
+
+//Solve a game board with expert strategies.
+//const solveGameExpert = solveGameCustom([trivialSolver, dominationSolver, avoidanceSolver, 
+//  supplySolver, doubleBindSolver, bindSupplySolver, doubleBindSupplySolver, overlapDoubleBindSupplySolver])
+
+
 
 // Solves a specific tile of a minesweeper game with trivial methods.
 // Specifically, if a tile has no mines left to mark around it, open all other tiles next to it,
@@ -679,6 +695,9 @@ function trivialSolver(game, frontier, tile) {
 // selfTiles, bindTiles, the tiles that are not part of the binding
 // joint, the tiles that are
 function getBinds(game, tile) {
+  if (tile === 'board') {
+    return getBoardBinds(game)
+  }
   let minesLeft = parseInt(tile.value)
   let closedTiles = []
   for (let neighbour of neighbours(game.board, tile)) {
@@ -766,9 +785,11 @@ function getBoardBinds(game) {
   for (let tile of allTiles(game.board)) {
     if (tile.value !== '' &&  tile.value !== 'M' && !tile.marked && tile.open) {
       let bind = {}
+      bind.selfMines = game.minesLeft
       bind.selfTiles = [...closedTiles]
       bind.bind = tile
       bind.bindMines = parseInt(tile.value)
+      bind.bindTiles = []
       bind.joint = []
       for (let neighbour of neighbours(game.board, tile)) {
         if (neighbour.marked) {
@@ -794,7 +815,12 @@ function dominationSolver(game, frontier, tile) {
       clickAllAndPushToFrontier(game, bind.bindTiles, frontier)
       discovered = discovered || bind.bindTiles.length > 0
     }
+    if (bind.bindMines === bind.selfMines && bind.bindTiles.length === 0) {
+      clickAllAndPushToFrontier(game, bind.selfTiles, frontier)
+      discovered = discovered || bind.selfTiles.length > 0
+    }
   }
+  
   return discovered
 }
 
@@ -844,61 +870,131 @@ function doubleBindSolver(game, frontier, tile) {
 }
 
 function bindSupplySolver(game, frontier) {
-  let binds = getBoardBinds(game)
-  for (let bind of binds) {
-    if (bind.bindMines === game.minesLeft) {
-      clickAllAndPushToFrontier(game, bind.selfTiles, frontier)
-      if (bind.selfTiles.length > 0) {
-        return true
-      }
+  if (game.minesLeft <= 5 || game.minesLeft >= game.tilesLeft - 5) {
+    if (dominationSolver(game, frontier, 'board')) {
+      return true
     }
-    if (bind.selfTiles.length + bind.bindMines === game.minesLeft) {
-      markAllAndPushToFrontier(game, bind.selfTiles, frontier)
-      if (bind.selfTiles.length > 0) {
-        return true
-      }
+    if (avoidanceSolver(game, frontier, 'board')) {
+      return true
     }
   }
   return false
 }
 
 function doubleBindSupplySolver(game, frontier) {
-  let doubleBinds = []
-  let binds = getBoardBinds(game)
-  for (let i = 0; i < binds.length; i++) {
-    for (let j = 0; j < i; j++) {
-      let fullArray = binds[i].joint.concat(binds[j].joint)
-      let seen = new Set();
-      const hasDuplicates = fullArray.some(function(currentObject) {
-        return seen.size === seen.add(currentObject).size;
-      });
-      if (!hasDuplicates) {
-        let doubleBind = {}
-        doubleBind.selfTiles = binds[i].selfTiles.filter(value => binds[j].selfTiles.includes(value));
-        doubleBind.a = binds[i].bind
-        doubleBind.aMines = binds[i].bindMines
-        doubleBind.aJoint = binds[i].joint
-        doubleBind.b = binds[j].bind
-        doubleBind.bMines = binds[j].bindMines
-        doubleBind.bJoint = binds[j].joint
-        doubleBinds.push(doubleBind)
+  if (game.minesLeft <= 10 || game.minesLeft >= game.tilesLeft - 10) {
+    let doubleBinds = []
+    let binds = getBoardBinds(game)
+    for (let i = 0; i < binds.length; i++) {
+      for (let j = 0; j < i; j++) {
+        let fullArray = binds[i].joint.concat(binds[j].joint)
+        let seen = new Set();
+        const hasDuplicates = fullArray.some(function(currentObject) {
+          return seen.size === seen.add(currentObject).size;
+        });
+        if (!hasDuplicates) {
+          let doubleBind = {}
+          doubleBind.selfTiles = binds[i].selfTiles.filter(value => binds[j].selfTiles.includes(value));
+          doubleBind.a = binds[i].bind
+          doubleBind.aMines = binds[i].bindMines
+          doubleBind.aJoint = binds[i].joint
+          doubleBind.b = binds[j].bind
+          doubleBind.bMines = binds[j].bindMines
+          doubleBind.bJoint = binds[j].joint
+          doubleBinds.push(doubleBind)
+        }
+      }
+    }
+    for (let bind of doubleBinds) {
+      if (bind.bMines + bind.aMines === game.minesLeft) {
+        clickAllAndPushToFrontier(game, bind.selfTiles, frontier)
+        if (bind.selfTiles.length > 0) {
+          return true
+        }
+      }
+      if (bind.selfTiles.length + bind.aMines + bind.bMines === game.minesLeft) {
+        markAllAndPushToFrontier(game, bind.selfTiles, frontier)
+        if (bind.selfTiles.length > 0) {
+          return true
+        }
       }
     }
   }
-  for (let bind of doubleBinds) {
-    if (bind.bMines + bind.aMines === game.minesLeft) {
-      clickAllAndPushToFrontier(game, bind.selfTiles, frontier)
-      if (bind.selfTiles.length > 0) {
-        return true
+  return false
+}
+
+// I need to clean up my code, the below code is scary
+function overlapDoubleBindSupplySolver(game, frontier) {
+  if (game.minesLeft <= 10 || game.minesLeft >= game.tilesLeft - 10) {
+    let doubleBinds = []
+    let binds = getBoardBinds(game)
+    for (let i = 0; i < binds.length; i++) {
+      for (let j = 0; j < i; j++) {
+
+        let aJoint = []
+        let bJoint = []
+        let doubleJoint = []
+        for (let aTile of binds[i].joint) {
+          for (let bTile of binds[j].joint) {
+            if (aTile === bTile) {
+              doubleJoint.push(aTile)
+            }
+          }
+        }
+        for (let aTile of binds[i].joint) {
+          let inJoint = false
+          for (let jointTile of doubleJoint) {
+            if (aTile === jointTile) {
+              inJoint = true
+            }
+          }
+          if (!inJoint) {
+            aJoint.push(aTile)
+          }
+        }
+        for (let bTile of binds[j].joint) {
+          let inJoint = false
+          for (let jointTile of doubleJoint) {
+            if (bTile === jointTile) {
+              inJoint = true
+            }
+          }
+          if (!inJoint) {
+            bJoint.push(bTile)
+          }
+        }
+        if (doubleJoint.length > 0 && aJoint.length > 0 && bJoint.length > 0) {
+          let doubleBind = {}
+          doubleBind.selfTiles = binds[i].selfTiles.filter(value => binds[j].selfTiles.includes(value));
+          doubleBind.a = binds[i].bind
+          doubleBind.aMines = binds[i].bindMines
+          doubleBind.aJoint = aJoint
+          doubleBind.b = binds[j].bind
+          doubleBind.bMines = binds[j].bindMines
+          doubleBind.bJoint = bJoint
+          doubleBind.abJoint = doubleJoint
+          doubleBinds.push(doubleBind)
+        }
       }
     }
-    if (bind.selfTiles.length + bind.aMines + bind.bMines === game.minesLeft) {
-      markAllAndPushToFrontier(game, bind.selfTiles, frontier)
-      if (bind.selfTiles.length > 0) {
-        return true
+    for (let bind of doubleBinds) {
+      if (bind.bMines + bind.aMines + bind.selfTiles.length === game.minesLeft) {
+        clickAllAndPushToFrontier(game, bind.abJoint, frontier)
+        markAllAndPushToFrontier(game, bind.selfTiles, frontier)
+        if (bind.selfTiles.length > 0 || bind.abJoint.length > 0) {
+          return true
+        }
+      }
+      if (bind.bMines + bind.aMines - bind.abJoint.length === game.minesLeft) {
+        markAllAndPushToFrontier(game, bind.abJoint, frontier)
+        clickAllAndPushToFrontier(game, bind.selfTiles, frontier)
+        if (bind.selfTiles.length > 0 || bind.abJoint.length > 0) {
+          return true
+        }
       }
     }
   }
+  return false
 }
 
 function clickAllAndPushToFrontier(game, tiles, frontier) {
@@ -1019,6 +1115,98 @@ class MultiFrontier {
 
 }
 
+// Solves a game with expert strategies.
+// Represents the board as a set of constraint satisfaction problems (CSPs).
+function solveGameExpert(game) {
+  const DEPTH = 4
+  let constraints = getConstraints(game)
+  console.log(constraints)
+  let currentDepth = 0
+  let logic = Array(DEPTH).fill(0);
+  while (currentDepth < DEPTH) {
+    if (solveConstraints(game, constraints, currentDepth + 1)) {
+      logic[currentDepth] += 1
+      currentDepth = 0
+    } else {
+      currentDepth += 1
+    }
+  }
+  if (game.state === 'won') {
+    return logic
+  }
+  else {
+    return null
+  }
+}
+
+// Gets a set of contraints which each represent a piece of information about the board.
+// The form of each constraint is {mines: (number of mines), tiles: (list of tile which contain that number of mines)}
+function getConstraints(game) {
+  let constraints = []
+  for (let tile of allTiles(game.board)) {
+    if (tile.open) {
+      let mines = parseInt(tile.value)
+      if (tile.value === '') {
+        mines = 0
+      }
+      let variables = []
+      for (let neighbour of neighbours(game.board, tile)) {
+        if (neighbour.marked) {
+          mines -= 1
+        } else if (!neighbour.open) {
+          variables.push((neighbour.x, neighbour.y))
+        }
+      }
+      if (variables.length > 0) {
+        constraints.push({mines: mines, variables: variables})
+      }
+    }
+  }
+  return constraints
+}
+
+// Solves a game with a set of constraints and a depth to look at (number of constraints to look at at a time). 
+// Updates the constraints list and game, and returns true if any progress was made
+function solveConstraints(game, constraints, depth) {
+  let problems = getProblems(constraints, depth)
+  let solved = new Set()
+  for (let problem of problems) {
+    let newSolves = solveProblem(problem)
+    for (let solve of newSolves) {
+      solved.add(solve)
+    }
+  }
+  for (let solve of solved) { 
+    if (solve[2] === 'mine') { // Placeholder?
+      markTile(game, tile)
+      updateConstraintsWithMine(constraints, solve[0], solve[1])
+    }
+  }
+  for (let solve of solved) {
+    if (solve[2] === 'tile') { // Placeholder?
+      clickTile(game, tile, false)
+      updateConstraintsWithTile(constraints, game, solve[0], solve[1])
+    }
+  }
+  return solved.length > 0
+}
+
+// Turn a list of constraints into a list of lists of constraints. 
+// Each sublist (problem) much have contraints that all link up in some way.
+// Each problem has [depth] constraints inside it.
+function getProblems(constraints, depth) {
+  return []
+}
+
+// Updates a list of constraints by changing the tile (x, y) to be a mine.
+function updateConstraintsWithMine(constraints, x, y) {
+  
+}
+
+// Updates a list of constraints by adding the tile (x, y) to the constraints.
+function updateConstraintsWithTile(constraints, game, x, y) {
+
+}
 
 </script>
 
