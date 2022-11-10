@@ -1113,7 +1113,9 @@ function solveGameExpert(game) {
   let currentDepth = 0
   let logic = Array(DEPTH).fill(0);
   while (currentDepth < DEPTH) {
-    if (solveConstraints(game, constraints, currentDepth + 1)) {
+    const constraintsSolved = solveConstraints(game, constraints, currentDepth + 1)
+    console.log(constraintsSolved)
+    if (constraintsSolved) {
       logic[currentDepth] += 1
       currentDepth = 0
     } else {
@@ -1167,11 +1169,11 @@ function solveConstraints(game, constraints, depth) {
   let solved = new Set()
   for (let problem of problems) {
     let newSolves = solveProblem(problem)
-    console.log(newSolves)
     for (let solve of newSolves) {
       solved.add(solve)
     }
   }
+  console.log(solved)
   for (let solve of solved) { 
     if (solve[2] === 'mine') {
       markTile(game, game.board[solve[0]][solve[1]])
@@ -1184,7 +1186,7 @@ function solveConstraints(game, constraints, depth) {
       updateConstraintsWithTile(constraints, game, solve[0], solve[1])
     }
   }
-  return solved.length > 0
+  return solved.size > 0
 }
 
 function solveProblem(problem) {
@@ -1225,10 +1227,17 @@ function getProblems(constraints, depth) {
 function updateConstraintsWithMine(constraints, x, y) {
   for (const constraint of constraints) {
     console.log(constraint.variables)
-    if (constraint.variables.includes([x, y])) {
+    let xyLocation = -1
+    let index = 0
+    for (const variable of constraint.variables) {
+      if (variable[0] === x && variable[1] === y) {
+        xyLocation = index
+      }
+      index += 1
+    }
+    if (xyLocation !== -1) {
       constraint.mines -= 1
-      const index = constraint.variables.indexOf([x, y]);
-      constraint.variables.splice(index, 1); // remove the tile (x, y) from the list of constraints as we know it's a mine
+      constraint.variables.splice(xyLocation, 1); // remove the tile (x, y) from the list of constraints as we know it's a mine
     }
   }
 }
@@ -1236,9 +1245,16 @@ function updateConstraintsWithMine(constraints, x, y) {
 // Updates a list of constraints by adding the tile (x, y) to the constraints.
 function updateConstraintsWithTile(constraints, game, x, y) {
   for (const constraint of constraints) {
-    if (constraint.variables.includes([x, y])) {
-      const index = constraint.variables.indexOf([x, y]);
-      constraint.variables.splice(index, 1); // remove the tile (x, y) from the list of constraints as we know it's a tile
+    let xyLocation = -1
+    let index = 0
+    for (const variable of constraint.variables) {
+      if (variable[0] === x && variable[1] === y) {
+        xyLocation = index
+      }
+      index += 1
+    }
+    if (xyLocation !== -1) {
+      constraint.variables.splice(xyLocation, 1); // remove the tile (x, y) from the list of constraints as we know it's a tile
     }
   }
   const tile = game.board[x][y]
