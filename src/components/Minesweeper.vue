@@ -1114,7 +1114,6 @@ function solveGameExpert(game) {
   let logic = Array(DEPTH).fill(0);
   while (currentDepth < DEPTH) {
     const constraintsSolved = solveConstraints(game, constraints, currentDepth + 1)
-    console.log(constraintsSolved)
     if (constraintsSolved) {
       logic[currentDepth] += 1
       currentDepth = 0
@@ -1161,11 +1160,12 @@ function addTileToConstraints(game, tile, constraints) {
   }
 }
 
-
 // Solves a game with a set of constraints and a depth to look at (number of constraints to look at at a time). 
 // Updates the constraints list and game, and returns true if any progress was made
 function solveConstraints(game, constraints, depth) {
   let problems = getProblems(constraints, depth)
+  console.log(depth)
+  console.log(problems)
   let solved = new Set()
   for (let problem of problems) {
     let newSolves = solveProblem(problem)
@@ -1173,7 +1173,6 @@ function solveConstraints(game, constraints, depth) {
       solved.add(solve)
     }
   }
-  console.log(solved)
   for (let solve of solved) { 
     if (solve[2] === 'mine') {
       markTile(game, game.board[solve[0]][solve[1]])
@@ -1203,7 +1202,7 @@ function solveProblem(problem) {
       }
     }
   } else {
-    // TODO
+    // TODO write a CSP solver for each problem that works on general cases.
   }
   return solves
 }
@@ -1211,20 +1210,46 @@ function solveProblem(problem) {
 // Turn a list of constraints into a list of lists of constraints. 
 // Each sublist (problem) much have contraints that all link up in some way.
 // Each problem has [depth] constraints inside it.
-function getProblems(constraints, depth) {
+function getProblems(constraints, depth, location=0) {
   const problems = []
   if (depth === 1) {
+    let index = 0
     for (const constraint of constraints) {
-      problems.push([constraint])
+      if (index >= location) {
+        problems.push([constraint])
+      }
+      index += 1
     }
   } else {
-    //TODO
+    let index = 0
+    for (const constraint of constraints) {
+      const partialProblems = getProblems(constraints, depth - 1, location + index + 1)
+      for (const partialProblem of partialProblems) {
+        let goodProblem = false
+        for (const secondConstraint of partialProblem) {
+          for (const secondTile of secondConstraint.variables) {
+            for (const tile of constraint.variables) {
+              if (tile[0] === secondTile[0] && tile[1] === secondTile[1]) {
+                goodProblem = true
+              }
+            }
+          }
+        }
+        if (goodProblem) {
+          partialProblem.push(constraint)
+          problems.push(partialProblem)
+        }
+      }
+      index += 1
+    }
   }
   return problems
 }
 
 // Updates a list of constraints by changing the tile (x, y) to be a mine.
 function updateConstraintsWithMine(constraints, x, y) {
+  let constraintIndex = 0
+  let constraintsToRemove = []
   for (const constraint of constraints) {
     console.log(constraint.variables)
     let xyLocation = -1
@@ -1233,17 +1258,27 @@ function updateConstraintsWithMine(constraints, x, y) {
       if (variable[0] === x && variable[1] === y) {
         xyLocation = index
       }
-      index += 1
+      index++
     }
     if (xyLocation !== -1) {
       constraint.mines -= 1
-      constraint.variables.splice(xyLocation, 1); // remove the tile (x, y) from the list of constraints as we know it's a mine
+      constraint.variables.splice(xyLocation, 1) // remove the tile (x, y) from the list of constraints as we know it's a mine
+      if (constraint.variables.length === 0) {
+        constraintsToRemove.push(constraintIndex)
+      }
     }
+    constraintIndex++
+  }
+  constraintsToRemove.reverse() // Done so splicing is stable
+  for (const id of constraintsToRemove) {
+    constraints.splice(id, 1)
   }
 }
 
 // Updates a list of constraints by adding the tile (x, y) to the constraints.
 function updateConstraintsWithTile(constraints, game, x, y) {
+  let constraintIndex = 0
+  let constraintsToRemove = []
   for (const constraint of constraints) {
     let xyLocation = -1
     let index = 0
@@ -1254,8 +1289,16 @@ function updateConstraintsWithTile(constraints, game, x, y) {
       index += 1
     }
     if (xyLocation !== -1) {
-      constraint.variables.splice(xyLocation, 1); // remove the tile (x, y) from the list of constraints as we know it's a tile
+      constraint.variables.splice(xyLocation, 1) // remove the tile (x, y) from the list of constraints as we know it's a tile
+      if (constraint.variables.length === 0) {
+        constraintsToRemove.push(constraintIndex)
+      }
     }
+    constraintIndex++
+  }
+  constraintsToRemove.reverse() // Done so splicing is stable
+  for (const id of constraintsToRemove) {
+    constraints.splice(id, 1)
   }
   const tile = game.board[x][y]
   addTileToConstraints(game, tile, constraints)
