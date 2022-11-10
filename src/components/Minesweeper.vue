@@ -97,15 +97,6 @@ function resetBoard(board) {
   }
 }
 
-// Mark a tile on the board as a mine and disable right click events.
-function markTileRightClick(event, game, tile) {
-  if (tile.open || game.state !== 'playing') {
-    return
-  }
-  event.preventDefault()
-  markTile(game, tile)
-}
-
 // Mark a tile on the board as a mine.
 function markTile(game, tile) {
   if (tile.open || game.state !== 'playing') {
@@ -1217,12 +1208,12 @@ function updateConstraintsWithTile(constraints, game, x, y) {
   </div>
   <h1 id="minesweeper-header">Minesweeper</h1>
   <div id="minesweeper-container">
-    <div v-for="row in mainGame.board" class="minesweeper-row">
-      <button v-for="tile in row" class="minesweeper-button" 
+    <div v-for="[row, index] in mainGame.board" :key="index" class="minesweeper-row">
+      <button v-for="[tile, index] in row" :key="index" class="minesweeper-button" 
         :class="[{ active: tile.open }, { inactive: !tile.open }, 'm' + tile.value]"
         :disabled=tile.open
-        v-on:contextmenu="markTileRightClick($event, mainGame, tile)"
-        v-on:click="clickTile(mainGame, tile)" >
+        @contextmenu.prevent="markTile(mainGame, tile)"
+        @click="clickTile(mainGame, tile)" >
         <img class="minesweeper-flag" v-if="!tile.open && tile.marked" src="@/assets/flag.svg">
         <img class="minesweeper-bomb" v-if="tile.open && (tile.value === 'M' || tile.value === 'E')" src="@/assets/bomb.svg">
         <span v-if="tile.open && tile.value !== 'M' && tile.value !== 'E'" class="minesweeper-button-text" :class="['m' + tile.value]">{{ tile.value }}</span>
@@ -1230,11 +1221,11 @@ function updateConstraintsWithTile(constraints, game, x, y) {
     </div>
   </div>
   <h4 id="minesweeper-mines-left-display">Mines Left: {{ mainGame.minesLeft }}</h4>
-  <button v-on:click="resetGame(mainGame, 9, 9, 10, smartSetupBeginner)" id="minesweeper-new-game-button">New Beginner Game</button>
-  <button v-on:click="resetGame(mainGame, 16, 16, 40, smartSetupIntermediate)" id="minesweeper-new-game-button">New Intermediate Game</button>
-  <button v-on:click="resetGame(mainGame, 30, 16, 99, setupBoard)" id="minesweeper-new-game-button">New Expert Game</button>
-  <button v-on:click="runUnitTests(mainGame)" id="minesweeper-new-game-button">Tests (For Dev Use)</button>
-  <button v-on:click="runSolverTests(mainGame)" id="minesweeper-new-game-button">Autosolve (For Dev Use)</button>
+  <button @click="resetGame(mainGame, 9, 9, 10, smartSetupBeginner)" id="minesweeper-new-game-button">New Beginner Game</button>
+  <button @click="resetGame(mainGame, 16, 16, 40, smartSetupIntermediate)" id="minesweeper-new-game-button">New Intermediate Game</button>
+  <button @click="resetGame(mainGame, 30, 16, 99, setupBoard)" id="minesweeper-new-game-button">New Expert Game</button>
+  <button @click="runUnitTests(mainGame)" id="minesweeper-new-game-button">Tests (For Dev Use)</button>
+  <button @click="runSolverTests(mainGame)" id="minesweeper-new-game-button">Autosolve (For Dev Use)</button>
   <h2 v-if="mainGame.state === 'won'">You Won! B)</h2>
   <h2 v-if="mainGame.state === 'lost'">You Lost :(</h2>
 </template>
