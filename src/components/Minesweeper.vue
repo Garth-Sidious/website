@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, toRaw } from 'vue'
+import { reactive } from 'vue'
 
 // Game states: setup (board displayed but not filled with mines), playing, won, lost
 let mainGame = reactive({})
@@ -635,7 +635,6 @@ function solveGameCustom(functions) {
 //  supplySolver, doubleBindSolver, bindSupplySolver, doubleBindSupplySolver, overlapDoubleBindSupplySolver])
 
 
-
 // Solves a specific tile of a minesweeper game with trivial methods.
 // Specifically, if a tile has no mines left to mark around it, open all other tiles next to it,
 // and if a tile has n closed tiles around it and n mines left, mark all those squares.
@@ -1075,7 +1074,6 @@ class SingleFrontier {
 
 }
 
-
 class MultiFrontier {
   constructor(board, functions) {
     this.board = board
@@ -1131,30 +1129,36 @@ function solveGameExpert(game) {
 }
 
 // Gets a set of contraints which each represent a piece of information about the board.
-// The form of each constraint is {mines: (number of mines), tiles: (list of tile which contain that number of mines)}
 function getConstraints(game) {
   let constraints = []
   for (let tile of allTiles(game.board)) {
     if (tile.open) {
-      let mines = parseInt(tile.value)
-      if (tile.value === '') {
-        mines = 0
-      }
-      let variables = []
-      for (let neighbour of neighbours(game.board, tile)) {
-        if (neighbour.marked) {
-          mines -= 1
-        } else if (!neighbour.open) {
-          variables.push((neighbour.x, neighbour.y))
-        }
-      }
-      if (variables.length > 0) {
-        constraints.push({mines: mines, variables: variables})
-      }
+      addTileToConstraints(game, tile, constraints)
     }
   }
   return constraints
 }
+
+// Adds a single tile as a constraint to a list of constraints.
+// The form of each constraint is {mines: (number of mines), tiles: (list of tile which contain that number of mines)}
+function addTileToConstraints(game, tile, constraints) {
+  let mines = parseInt(tile.value)
+  if (tile.value === '') {
+    mines = 0
+  }
+  let variables = []
+  for (let neighbour of neighbours(game.board, tile)) {
+    if (neighbour.marked) {
+      mines -= 1
+    } else if (!neighbour.open) {
+      variables.push([neighbour.x, neighbour.y])
+    }
+  }
+  if (variables.length > 0) {
+    constraints.push({mines: mines, variables: variables})
+  }
+}
+
 
 // Solves a game with a set of constraints and a depth to look at (number of constraints to look at at a time). 
 // Updates the constraints list and game, and returns true if any progress was made
@@ -1163,40 +1167,82 @@ function solveConstraints(game, constraints, depth) {
   let solved = new Set()
   for (let problem of problems) {
     let newSolves = solveProblem(problem)
+    console.log(newSolves)
     for (let solve of newSolves) {
       solved.add(solve)
     }
   }
   for (let solve of solved) { 
-    if (solve[2] === 'mine') { // Placeholder?
-      markTile(game, tile)
+    if (solve[2] === 'mine') {
+      markTile(game, game.board[solve[0]][solve[1]])
       updateConstraintsWithMine(constraints, solve[0], solve[1])
     }
   }
   for (let solve of solved) {
-    if (solve[2] === 'tile') { // Placeholder?
-      clickTile(game, tile, false)
+    if (solve[2] === 'tile') {
+      clickTile(game, game.board[solve[0]][solve[1]], false)
       updateConstraintsWithTile(constraints, game, solve[0], solve[1])
     }
   }
   return solved.length > 0
 }
 
+function solveProblem(problem) {
+  const solves = []
+  if (problem.length === 1) {
+    if (problem[0].mines === 0) {
+      for (const tile of problem[0].variables) {
+        solves.push([tile[0], tile[1], 'tile'])
+      }
+    }
+    if (problem[0].mines === problem[0].variables.length) {
+      for (const tile of problem[0].variables) {
+        solves.push([tile[0], tile[1], 'mine'])
+      }
+    }
+  } else {
+    // TODO
+  }
+  return solves
+}
+
 // Turn a list of constraints into a list of lists of constraints. 
 // Each sublist (problem) much have contraints that all link up in some way.
 // Each problem has [depth] constraints inside it.
 function getProblems(constraints, depth) {
-  return []
+  const problems = []
+  if (depth === 1) {
+    for (const constraint of constraints) {
+      problems.push([constraint])
+    }
+  } else {
+    //TODO
+  }
+  return problems
 }
 
 // Updates a list of constraints by changing the tile (x, y) to be a mine.
 function updateConstraintsWithMine(constraints, x, y) {
-  
+  for (const constraint of constraints) {
+    console.log(constraint.variables)
+    if (constraint.variables.includes([x, y])) {
+      constraint.mines -= 1
+      const index = constraint.variables.indexOf([x, y]);
+      constraint.variables.splice(index, 1); // remove the tile (x, y) from the list of constraints as we know it's a mine
+    }
+  }
 }
 
 // Updates a list of constraints by adding the tile (x, y) to the constraints.
 function updateConstraintsWithTile(constraints, game, x, y) {
-
+  for (const constraint of constraints) {
+    if (constraint.variables.includes([x, y])) {
+      const index = constraint.variables.indexOf([x, y]);
+      constraint.variables.splice(index, 1); // remove the tile (x, y) from the list of constraints as we know it's a tile
+    }
+  }
+  const tile = game.board[x][y]
+  addTileToConstraints(game, tile, constraints)
 }
 
 </script>
@@ -1208,8 +1254,8 @@ function updateConstraintsWithTile(constraints, game, x, y) {
   </div>
   <h1 id="minesweeper-header">Minesweeper</h1>
   <div id="minesweeper-container">
-    <div v-for="[row, index] in mainGame.board" :key="index" class="minesweeper-row">
-      <button v-for="[tile, index] in row" :key="index" class="minesweeper-button" 
+    <div v-for="(row, index) in mainGame.board" :key="index" class="minesweeper-row">
+      <button v-for="(tile, index) in row" :key="index" class="minesweeper-button" 
         :class="[{ active: tile.open }, { inactive: !tile.open }, 'm' + tile.value]"
         :disabled=tile.open
         @contextmenu.prevent="markTile(mainGame, tile)"
