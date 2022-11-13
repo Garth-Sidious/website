@@ -1,6 +1,10 @@
 <script setup>
 import { reactive } from 'vue'
 
+const TILE = 0
+const MINE = 1
+const UNKNOWN = 2
+
 // Game states: setup (board displayed but not filled with mines), playing, won, lost
 let mainGame = reactive({})
 resetGame(mainGame, 9, 9, 10, smartSetupBeginner)
@@ -219,7 +223,7 @@ function miniToGame(mini, game) {
   game.minesLeft = game.mines - game.markedTiles
 }
 
-//Create a mini from a gamr, for use in testing (and possibly other things?).
+//Create a mini from a game, for use in testing (and possibly other things?).
 //Format for mini is an array of mines M, marked mines X, closed tiles C, and open tiles O.
 function gameToMini(game) {
   let mini = Array(game.height).fill().map(() => Array(game.width).fill(0));
@@ -1109,7 +1113,6 @@ class MultiFrontier {
 function solveGameExpert(game) {
   const DEPTH = 4
   let constraints = getConstraints(game)
-  console.log(constraints)
   let currentDepth = 0
   let logic = Array(DEPTH).fill(0);
   while (currentDepth < DEPTH) {
@@ -1164,8 +1167,6 @@ function addTileToConstraints(game, tile, constraints) {
 // Updates the constraints list and game, and returns true if any progress was made
 function solveConstraints(game, constraints, depth) {
   let problems = getProblems(constraints, depth)
-  console.log(depth)
-  console.log(problems)
   let solved = new Set()
   for (let problem of problems) {
     let newSolves = solveProblem(problem)
@@ -1174,13 +1175,13 @@ function solveConstraints(game, constraints, depth) {
     }
   }
   for (let solve of solved) { 
-    if (solve[2] === 'mine') {
+    if (solve[2] === MINE) {
       markTile(game, game.board[solve[0]][solve[1]])
       updateConstraintsWithMine(constraints, solve[0], solve[1])
     }
   }
   for (let solve of solved) {
-    if (solve[2] === 'tile') {
+    if (solve[2] === TILE) {
       clickTile(game, game.board[solve[0]][solve[1]], false)
       updateConstraintsWithTile(constraints, game, solve[0], solve[1])
     }
@@ -1188,23 +1189,66 @@ function solveConstraints(game, constraints, depth) {
   return solved.size > 0
 }
 
+// Solves a problem. Returns a list of solutions that can be deducted from the problem.
+// Solutions are in the form (x, y, tile/mine)
 function solveProblem(problem) {
+  const possibilites = getProblemPossibilities(problem)
+  const truth = possibilites[0]
+  for (const possibility of possibilites) {
+    for (let i = 0; i < possibility.length; i++) {
+      if (possibility[i][2] !== truth[i][2]) {
+        truth[i][2] = UNKNOWN
+      }
+    }
+  }
   const solves = []
-  if (problem.length === 1) {
-    if (problem[0].mines === 0) {
-      for (const tile of problem[0].variables) {
-        solves.push([tile[0], tile[1], 'tile'])
-      }
+  for (const value of truth) {
+    if (value[2] !== UNKNOWN) {
+      solves.push(value)
     }
-    if (problem[0].mines === problem[0].variables.length) {
-      for (const tile of problem[0].variables) {
-        solves.push([tile[0], tile[1], 'mine'])
-      }
-    }
-  } else {
-    // TODO write a CSP solver for each problem that works on general cases.
   }
   return solves
+}
+
+// Gets all arrangments of tiles and mines which solve a problem.
+function getProblemPossibilities(problem) {
+  if (problem.length == 0) {
+    return [[]] //Return a single solution with no content.
+  } else {
+    let possibilites = []
+    const removed = problem[0].variables[0]
+    let mineValid = true
+    let tileValid = true
+    for (const constraint of problem) {
+      let contained = false
+      for (const variable of constraint.variables) {
+        contained = contained || (variable[0] == removed[0] && variable[1] == removed[1])
+      }
+      if (contained) {
+        mineValid = mineValid && constraint.mines > 0
+        tileValid = tileValid && constraint.mines < constraint.variables.length
+      }
+    }
+    if (mineValid) {
+      const a = JSON.parse(JSON.stringify(problem))
+      updateConstraintsWithMine(a, removed[0], removed[1])
+      const incompletePossibilites = getProblemPossibilities(a)
+      for (const possibility of incompletePossibilites) {
+        possibility.push([removed[0], removed[1], MINE])
+      }
+      possibilites = possibilites.concat(incompletePossibilites)
+    }
+    if (tileValid) {
+      const b = JSON.parse(JSON.stringify(problem))
+      updateConstraintsWithTileSmall(b, removed[0], removed[1])
+      const incompletePossibilites = getProblemPossibilities(b)
+      for (const possibility of incompletePossibilites) {
+        possibility.push([removed[0], removed[1], TILE])
+      }
+      possibilites = possibilites.concat(incompletePossibilites)
+    }
+    return possibilites
+  }
 }
 
 // Turn a list of constraints into a list of lists of constraints. 
@@ -1251,7 +1295,6 @@ function updateConstraintsWithMine(constraints, x, y) {
   let constraintIndex = 0
   let constraintsToRemove = []
   for (const constraint of constraints) {
-    console.log(constraint.variables)
     let xyLocation = -1
     let index = 0
     for (const variable of constraint.variables) {
@@ -1276,7 +1319,7 @@ function updateConstraintsWithMine(constraints, x, y) {
 }
 
 // Updates a list of constraints by adding the tile (x, y) to the constraints.
-function updateConstraintsWithTile(constraints, game, x, y) {
+function updateConstraintsWithTileSmall(constraints, x, y) {
   let constraintIndex = 0
   let constraintsToRemove = []
   for (const constraint of constraints) {
@@ -1300,6 +1343,11 @@ function updateConstraintsWithTile(constraints, game, x, y) {
   for (const id of constraintsToRemove) {
     constraints.splice(id, 1)
   }
+}
+
+// Updates a list of constraints by adding the tile (x, y) to the constraints. Also adds the new tile to the constraints list.
+function updateConstraintsWithTile(constraints, game, x, y) {
+  updateConstraintsWithTileSmall(constraints, x, y)
   const tile = game.board[x][y]
   addTileToConstraints(game, tile, constraints)
 }
