@@ -326,18 +326,18 @@ function runUnitTests(game) {
   runUnitTest(game, solveGameExpert, ["MMCC", "MOOX", "COXX", "CXXX"], ["XXOO", "XOOX", "OOXX", "OXXX"]) // double bind
 
   runUnitTest(game, solveGameExpert, ["OCM", "CCM", "CMC", "CCC"], ["OOX", "OOX", "OXO", "OOO"])
-  //runUnitTest(game, solveGameExpert, ["OCM", "CCC", "MCC", "MMC"], ["OOX", "OOO", "XOO", "XMC"])
-  //runUnitTest(game, solveGameExpert, ["OCM", "CCC", "CCM", "MMM"], ["OOX", "OOO", "OOX", "XXX"])
+  runUnitTest(game, solveGameExpert, ["OCM", "CCC", "MCC", "MMC"], ["OOX", "OOO", "XOO", "XMC"])
+  runUnitTest(game, solveGameExpert, ["OCM", "CCC", "CCM", "MMM"], ["OOX", "OOO", "OOX", "XXX"])
 
   // overlap double bind board problems
-  //runUnitTest(game, solveGameExpert, ["OCCMM", "CCCMM", "MCMCC", "MCCCC"], ["OOOXX", "OOOXX", "XOXOO", "XOOOO"])
-  //runUnitTest(game, solveGameExpert, ["OCCCC", "CCCMM", "MCCCC", "MCMCC"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
+  runUnitTest(game, solveGameExpert, ["OCCMM", "CCCMM", "MCMCC", "MCCCC"], ["OOOXX", "OOOXX", "XOXOO", "XOOOO"])
+  runUnitTest(game, solveGameExpert, ["OCCCC", "CCCMM", "MCCCC", "MCMCC"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
 
   // intermediate was having trouble solving this before a fix
-  //runUnitTest(game, solveGameIntermediate, ["OCCMM", "CCCCM", "MCMCC", "MCCCC"], ["OOOMM","OOOCM","XOXOC","MCCCC"])
+  runUnitTest(game, solveGameIntermediate, ["OCCMM", "CCCCM", "MCMCC", "MCCCC"], ["OOOMM","OOOCM","XOXOC","MCCCC"])
 
   // triple overlap
-  //runUnitTest(game, solveGameExpert, ["OCCMM", "CCCCM", "MMCCC", "CMCCC"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
+  runUnitTest(game, solveGameExpert, ["OCCMM", "CCCCM", "MMCCC", "CMCCC"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
   // ??? (awful) (quad overlap???) 
   //runUnitTest(game, solveGameExpert, ["OCCCM", "CCCMM", "MCCCC", "MMCMC"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
   // wire
@@ -1156,9 +1156,7 @@ function addTileToConstraints(game, tile, constraints) {
 // Solves a game with a set of constraints and a depth to look at (number of constraints to look at at a time). 
 // Updates the constraints list and game, and returns true if any progress was made
 function solveConstraints(game, constraints, depth) {
-  //console.log('---------------------------------------', depth)
   const problems = getProblems(constraints, depth)
-  //console.log('PROBLEMS', problems)
   let solved = []
   for (const problem of problems) {
     let newSolves = solveProblem(problem)
@@ -1175,23 +1173,23 @@ function solveConstraints(game, constraints, depth) {
     }
   }
   // This is bad code, but to be honest I'm kind of tired of looking at it. Future me, you're in trouble!
-  // if (depth > 1) {
-  //   const boardProblems = getProblems(constraints, depth - 1)
-  //   for (const problem of boardProblems) {
-  //     let newSolves = solveBoardProblem(game, problem)
-  //     for (const newSolve of newSolves) {
-  //       let present = false
-  //       for (const solve of solved) {
-  //         if (solve[0] === newSolve[0] && solve[1] === newSolve[1]) {
-  //           present = true
-  //         }
-  //       }
-  //       if (!present) {
-  //         solved.push(newSolve)
-  //       }
-  //     }
-  //   }
-  // }
+  if (depth > 1) {
+    const boardProblems = getBoardProblems(constraints, depth - 1)
+    for (const problem of boardProblems) {
+      let newSolves = solveBoardProblem(game, problem)
+      for (const newSolve of newSolves) {
+        let present = false
+        for (const solve of solved) {
+          if (solve[0] === newSolve[0] && solve[1] === newSolve[1]) {
+            present = true
+          }
+        }
+        if (!present) {
+          solved.push(newSolve)
+        }
+      }
+    }
+  }
   for (let solve of solved) { 
     if (solve[2] === MINE) {
       markTile(game, game.board[solve[0]][solve[1]])
@@ -1212,8 +1210,6 @@ function solveConstraints(game, constraints, depth) {
 function solveProblem(problem) {
   const possibilites = getProblemPossibilities(problem)
   const truth = possibilites[0]
-  //console.log('problem', problem)
-  //console.log('possiblities', JSON.parse(JSON.stringify(possibilites)))
   for (const possibility of possibilites) {
     for (let i = 0; i < possibility.length; i++) {
       if (possibility[i][2] !== truth[i][2]) {
@@ -1286,11 +1282,7 @@ function solveBoardProblem(game, problem) {
       hingeTiles.push(variable)
     }
   }
-  console.log(problem)
-  console.log('HOWWWWWWWWWWWWWWWWWWWWWWWW')
   const possibilites = getBoardProblemPossibilities(problem, game.minesLeft, hingeTiles.length, game.tilesLeft - hingeTiles.length + game.minesLeft)
-  console.log('LOOOOOOOOOOOOOOOOWWWWWWWWWWWWWWWWWWW')
-  console.log(JSON.parse(JSON.stringify(possibilites)))
   const truth = possibilites[0]
   for (const possibility of possibilites) {
     for (let i = 0; i < possibility.length; i++) {
@@ -1304,13 +1296,13 @@ function solveBoardProblem(game, problem) {
     if (value[2] !== UNKNOWN) {
       if (value[0] === HIDDEN_TILES) {
         for (const tile of allTiles(game.board)) {
-          if (!tile.open) {
+          if (!tile.open && !tile.marked) {
             let good = true
             for (const hingeTile of hingeTiles) {
               good = good && !(hingeTile[0] === tile.x && hingeTile[1] === tile.y)
             }
             if (good) {
-              solves.push([tile.x, tile.x, value[2]])
+              solves.push([tile.x, tile.y, value[2]])
             }
           }
         }
@@ -1319,26 +1311,20 @@ function solveBoardProblem(game, problem) {
       }
     }
   }
-  console.log(solves)
-  return solves
+  return JSON.parse(JSON.stringify(solves)) // Deep copy to prevent any escaping
 }
 
 // Gets all arrangments of tiles and mines which solve a problem.
 function getBoardProblemPossibilities(problem, mines, visibleTiles, hiddenTiles) {
   if (problem.length == 0) {
     if (mines === 0) {
-      console.log('sweep time')
       return [[[HIDDEN_TILES, HIDDEN_TILES, TILE]]]
     } else if (mines === hiddenTiles) {
-        console.log('got em')
         return [[[HIDDEN_TILES, HIDDEN_TILES, MINE]]]
     } else {
-      console.log('no know')
       return [[[HIDDEN_TILES, HIDDEN_TILES, UNKNOWN]]]
     }
   } else {
-    console.log('hopeful!')
-    console.log(problem, mines, hiddenTiles)
     let possibilites = []
     const removed = problem[0].variables[0]
     let mineValid = true
@@ -1346,29 +1332,20 @@ function getBoardProblemPossibilities(problem, mines, visibleTiles, hiddenTiles)
     for (const constraint of problem) {
       let contained = false
       for (const variable of constraint.variables) {
-        contained = contained || (variable[0] == removed[0] && variable[1] == removed[1])
+        contained ||= (variable[0] == removed[0] && variable[1] == removed[1])
       }
       if (contained) {
-        mineValid = mineValid && constraint.mines > 0
-        tileValid = tileValid && constraint.mines < constraint.variables.length
-        if (!tileValid) {
-          console.log('here we are!', constraint)
-        }
+        mineValid &&= constraint.mines > 0
+        tileValid &&= constraint.mines < constraint.variables.length
       }
     }
-    mineValid = mineValid && mines > 0
-    console.log(mines)
-    console.log(hiddenTiles)
-    console.log(visibleTiles)
-    tileValid = tileValid && mines < hiddenTiles + visibleTiles
-    console.log('mines ->', mineValid)
-    console.log('tiles ->', tileValid)
+    mineValid &&= mines > 0
+    tileValid &&= mines < hiddenTiles + visibleTiles
     if (mineValid) {
       const a = JSON.parse(JSON.stringify(problem))
       updateConstraintsWithMine(a, removed[0], removed[1])
       const incompletePossibilites = getBoardProblemPossibilities(a, mines - 1, visibleTiles - 1, hiddenTiles)
       for (const possibility of incompletePossibilites) {
-        console.log('p mine', JSON.parse(JSON.stringify(possibility)))
         possibility.push([removed[0], removed[1], MINE])
       }
       possibilites = possibilites.concat(incompletePossibilites)
@@ -1378,12 +1355,10 @@ function getBoardProblemPossibilities(problem, mines, visibleTiles, hiddenTiles)
       updateConstraintsWithTileSmall(b, removed[0], removed[1])
       const incompletePossibilites = getBoardProblemPossibilities(b, mines, visibleTiles - 1, hiddenTiles)
       for (const possibility of incompletePossibilites) {
-        console.log('p tile', JSON.parse(JSON.stringify(possibility)))
         possibility.push([removed[0], removed[1], TILE])
       }
       possibilites = possibilites.concat(incompletePossibilites)
     }
-    console.log('passing off', JSON.parse(JSON.stringify(possibilites)))
     return JSON.parse(JSON.stringify(possibilites))
   }
 }
@@ -1446,6 +1421,43 @@ function getProblems(constraints, depth, banned={}, partialProblem=[]) {
       const newProblems = getProblems(constraints, depth - 1, bans, newProblem)
       for (const problem of newProblems) {
         problems.push(problem)
+      }
+    }
+  }
+  return problems
+}
+
+// Turn a list of constraints into a list of lists of constraints. 
+// Each sublist (problem) much have contraints BUT THEY DON'T HAVE TO LINK UP (not done)
+// Each problem has [depth] constraints inside it.
+// Note to future me: Hopefully you don't have to edit the below code ;)
+function getBoardProblems(constraints, depth, banned={}, partialProblem=[]) {
+  const problems = []
+  if (depth === 0) {
+    problems.push(partialProblem)
+  } else if (partialProblem.length === 0) {
+    for (let i = 0; i < constraints.length; i++) {
+      const bans = {}
+      for (let j = 0; j <= i; j++) {
+        bans[j] = true
+      }
+      const newProblems = getProblems(constraints, depth - 1, bans, [constraints[i]])
+      for (const problem of newProblems)
+      problems.push(problem)
+    }
+  } else {
+    for (let i = 0; i < constraints.length; i++) {
+      if (!(i in banned)) {
+        const bans = Object.create(banned)
+        for (let j = 0; j <= i; j++) {
+          bans[j] = true
+        }
+        const newProblem = Array.from(partialProblem)
+        newProblem.push(constraints[i])
+        const newProblems = getProblems(constraints, depth - 1, bans, newProblem)
+        for (const problem of newProblems) {
+          problems.push(problem)
+        }
       }
     }
   }
