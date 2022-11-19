@@ -4,6 +4,7 @@ import { reactive } from 'vue'
 const TILE = 0
 const MINE = 1
 const UNKNOWN = 2
+const HIDDEN_TILES = -1
 
 // Game states: setup (board displayed but not filled with mines), playing, won, lost
 let mainGame = reactive({})
@@ -325,18 +326,18 @@ function runUnitTests(game) {
   runUnitTest(game, solveGameExpert, ["MMCC", "MOOX", "COXX", "CXXX"], ["XXOO", "XOOX", "OOXX", "OXXX"]) // double bind
 
   runUnitTest(game, solveGameExpert, ["OCM", "CCM", "CMC", "CCC"], ["OOX", "OOX", "OXO", "OOO"])
-  runUnitTest(game, solveGameExpert, ["OCM", "CCC", "MCC", "MMC"], ["OOX", "OOO", "XOO", "XMC"])
-  runUnitTest(game, solveGameExpert, ["OCM", "CCC", "CCM", "MMM"], ["OOX", "OOO", "OOX", "XXX"])
+  //runUnitTest(game, solveGameExpert, ["OCM", "CCC", "MCC", "MMC"], ["OOX", "OOO", "XOO", "XMC"])
+  //runUnitTest(game, solveGameExpert, ["OCM", "CCC", "CCM", "MMM"], ["OOX", "OOO", "OOX", "XXX"])
 
   // overlap double bind board problems
-  runUnitTest(game, solveGameExpert, ["OCCMM", "CCCMM", "MCMCC", "MCCCC"], ["OOOXX", "OOOXX", "XOXOO", "XOOOO"])
-  runUnitTest(game, solveGameExpert, ["OCCCC", "CCCMM", "MCCCC", "MCMCC"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
+  //runUnitTest(game, solveGameExpert, ["OCCMM", "CCCMM", "MCMCC", "MCCCC"], ["OOOXX", "OOOXX", "XOXOO", "XOOOO"])
+  //runUnitTest(game, solveGameExpert, ["OCCCC", "CCCMM", "MCCCC", "MCMCC"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
 
   // intermediate was having trouble solving this before a fix
-  runUnitTest(game, solveGameIntermediate, ["OCCMM", "CCCCM", "MCMCC", "MCCCC"], ["OOOMM","OOOCM","XOXOC","MCCCC"])
+  //runUnitTest(game, solveGameIntermediate, ["OCCMM", "CCCCM", "MCMCC", "MCCCC"], ["OOOMM","OOOCM","XOXOC","MCCCC"])
 
   // triple overlap
-  runUnitTest(game, solveGameExpert, ["OCCMM", "CCCCM", "MMCCC", "CMCCC"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
+  //runUnitTest(game, solveGameExpert, ["OCCMM", "CCCCM", "MMCCC", "CMCCC"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
   // ??? (awful) (quad overlap???) 
   //runUnitTest(game, solveGameExpert, ["OCCCM", "CCCMM", "MCCCC", "MMCMC"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
   // wire
@@ -560,45 +561,34 @@ function microNeighbours(micro, tile, width) {
 }
 
 function runSolverTests(game) {
-  let count = 10000
+  let count = 100
   //6536 1764 625 1075 beginner
   //2441 3541 934 3084 intermediate
   //6 934 453 8607 expert
-  let beginner = 0
-  let intermediate = 0
-  let expert = 0
-  let superExpert = 0
-  let testGame = {} 
+  const results = []
+  const testGame = {} 
   console.time('10k iterations')
   for (let i = 0; i < count; i++) {
-    resetGame(testGame, 16, 16, 40, setupBoard)
-    clickTile(testGame, testGame.board[4][4])
-    solveGameIntermediate(testGame)
-    if (testGame.state === 'playing') {
-      solveGameCustom([trivialSolver, dominationSolver, avoidanceSolver, 
-  supplySolver, doubleBindSolver, bindSupplySolver, doubleBindSupplySolver])(testGame)
-      if (testGame.state === 'playing') {
-        solveGameExpert(testGame)
-        if (testGame.state === 'playing') {
-          superExpert += 1
-        } else {
-          expert += 1
-        }
-      } else {
-        intermediate += 1
-      }
-    } else {
-      beginner += 1
+    if (i % 100 === 0) {
+      console.log(i)
     }
+    resetGame(testGame, 30, 16, 99, setupBoard)
+    clickTile(testGame, testGame.board[4][4])
+    const usage = solveGameExpert(testGame)
+    if (usage) {
+      usage.reverse()
+    }
+    results.push(usage)
   }
   console.timeEnd('10k iterations')
-  resetGame(game, 16, 16, 40, setupBoard)
+  results.sort()
+  console.log(results)
+  resetGame(game, 30, 16, 99, setupBoard)
   game.board = testGame.board
   game.tilesLeft = testGame.tilesLeft
   game.markedTiles = testGame.markedTiles
   game.minesLeft = testGame.minesLeft
   game.state = testGame.state
-  console.log(beginner, intermediate, expert, superExpert)
 }
 
 //Solve a game board with beginner strategies.
@@ -1166,14 +1156,42 @@ function addTileToConstraints(game, tile, constraints) {
 // Solves a game with a set of constraints and a depth to look at (number of constraints to look at at a time). 
 // Updates the constraints list and game, and returns true if any progress was made
 function solveConstraints(game, constraints, depth) {
-  let problems = getProblems(constraints, depth)
-  let solved = new Set()
-  for (let problem of problems) {
+  //console.log('---------------------------------------', depth)
+  const problems = getProblems(constraints, depth)
+  //console.log('PROBLEMS', problems)
+  let solved = []
+  for (const problem of problems) {
     let newSolves = solveProblem(problem)
-    for (let solve of newSolves) {
-      solved.add(solve)
+    for (const newSolve of newSolves) {
+      let present = false
+      for (const solve of solved) {
+        if (solve[0] === newSolve[0] && solve[1] === newSolve[1]) {
+          present = true
+        }
+      }
+      if (!present) {
+        solved.push(newSolve)
+      }
     }
   }
+  // This is bad code, but to be honest I'm kind of tired of looking at it. Future me, you're in trouble!
+  // if (depth > 1) {
+  //   const boardProblems = getProblems(constraints, depth - 1)
+  //   for (const problem of boardProblems) {
+  //     let newSolves = solveBoardProblem(game, problem)
+  //     for (const newSolve of newSolves) {
+  //       let present = false
+  //       for (const solve of solved) {
+  //         if (solve[0] === newSolve[0] && solve[1] === newSolve[1]) {
+  //           present = true
+  //         }
+  //       }
+  //       if (!present) {
+  //         solved.push(newSolve)
+  //       }
+  //     }
+  //   }
+  // }
   for (let solve of solved) { 
     if (solve[2] === MINE) {
       markTile(game, game.board[solve[0]][solve[1]])
@@ -1186,7 +1204,7 @@ function solveConstraints(game, constraints, depth) {
       updateConstraintsWithTile(constraints, game, solve[0], solve[1])
     }
   }
-  return solved.size > 0
+  return solved.length > 0
 }
 
 // Solves a problem. Returns a list of solutions that can be deducted from the problem.
@@ -1194,6 +1212,8 @@ function solveConstraints(game, constraints, depth) {
 function solveProblem(problem) {
   const possibilites = getProblemPossibilities(problem)
   const truth = possibilites[0]
+  //console.log('problem', problem)
+  //console.log('possiblities', JSON.parse(JSON.stringify(possibilites)))
   for (const possibility of possibilites) {
     for (let i = 0; i < possibility.length; i++) {
       if (possibility[i][2] !== truth[i][2]) {
@@ -1251,40 +1271,182 @@ function getProblemPossibilities(problem) {
   }
 }
 
-// Turn a list of constraints into a list of lists of constraints. 
-// Each sublist (problem) much have contraints that all link up in some way.
-// Each problem has [depth] constraints inside it.
-function getProblems(constraints, depth, location=0) {
-  const problems = []
-  if (depth === 1) {
-    let index = 0
-    for (const constraint of constraints) {
-      if (index >= location) {
-        problems.push([constraint])
+// Solves a board problem. Returns a list of solutions that can be deducted from the problem.
+// Solutions are in the form (x, y, tile/mine)
+function solveBoardProblem(game, problem) {
+  const hingeTiles = []
+  for (const constraint of problem) {
+    for (const variable of constraint.variables) {
+      let good = true
+      for (const tile of hingeTiles) {
+        if (tile[0] === variable[0] && tile[1] === variable[1]) {
+          good = false
+        }
       }
-      index += 1
+      hingeTiles.push(variable)
     }
-  } else {
-    let index = 0
-    for (const constraint of constraints) {
-      const partialProblems = getProblems(constraints, depth - 1, location + index + 1)
-      for (const partialProblem of partialProblems) {
-        let goodProblem = false
-        for (const secondConstraint of partialProblem) {
-          for (const secondTile of secondConstraint.variables) {
-            for (const tile of constraint.variables) {
-              if (tile[0] === secondTile[0] && tile[1] === secondTile[1]) {
-                goodProblem = true
-              }
+  }
+  console.log(problem)
+  console.log('HOWWWWWWWWWWWWWWWWWWWWWWWW')
+  const possibilites = getBoardProblemPossibilities(problem, game.minesLeft, hingeTiles.length, game.tilesLeft - hingeTiles.length + game.minesLeft)
+  console.log('LOOOOOOOOOOOOOOOOWWWWWWWWWWWWWWWWWWW')
+  console.log(JSON.parse(JSON.stringify(possibilites)))
+  const truth = possibilites[0]
+  for (const possibility of possibilites) {
+    for (let i = 0; i < possibility.length; i++) {
+      if (possibility[i][2] !== truth[i][2]) {
+        truth[i][2] = UNKNOWN
+      }
+    }
+  }
+  const solves = []
+  for (const value of truth) {
+    if (value[2] !== UNKNOWN) {
+      if (value[0] === HIDDEN_TILES) {
+        for (const tile of allTiles(game.board)) {
+          if (!tile.open) {
+            let good = true
+            for (const hingeTile of hingeTiles) {
+              good = good && !(hingeTile[0] === tile.x && hingeTile[1] === tile.y)
+            }
+            if (good) {
+              solves.push([tile.x, tile.x, value[2]])
             }
           }
         }
-        if (goodProblem) {
-          partialProblem.push(constraint)
-          problems.push(partialProblem)
+      } else {
+        solves.push(value)
+      }
+    }
+  }
+  console.log(solves)
+  return solves
+}
+
+// Gets all arrangments of tiles and mines which solve a problem.
+function getBoardProblemPossibilities(problem, mines, visibleTiles, hiddenTiles) {
+  if (problem.length == 0) {
+    if (mines === 0) {
+      console.log('sweep time')
+      return [[[HIDDEN_TILES, HIDDEN_TILES, TILE]]]
+    } else if (mines === hiddenTiles) {
+        console.log('got em')
+        return [[[HIDDEN_TILES, HIDDEN_TILES, MINE]]]
+    } else {
+      console.log('no know')
+      return [[[HIDDEN_TILES, HIDDEN_TILES, UNKNOWN]]]
+    }
+  } else {
+    console.log('hopeful!')
+    console.log(problem, mines, hiddenTiles)
+    let possibilites = []
+    const removed = problem[0].variables[0]
+    let mineValid = true
+    let tileValid = true
+    for (const constraint of problem) {
+      let contained = false
+      for (const variable of constraint.variables) {
+        contained = contained || (variable[0] == removed[0] && variable[1] == removed[1])
+      }
+      if (contained) {
+        mineValid = mineValid && constraint.mines > 0
+        tileValid = tileValid && constraint.mines < constraint.variables.length
+        if (!tileValid) {
+          console.log('here we are!', constraint)
         }
       }
-      index += 1
+    }
+    mineValid = mineValid && mines > 0
+    console.log(mines)
+    console.log(hiddenTiles)
+    console.log(visibleTiles)
+    tileValid = tileValid && mines < hiddenTiles + visibleTiles
+    console.log('mines ->', mineValid)
+    console.log('tiles ->', tileValid)
+    if (mineValid) {
+      const a = JSON.parse(JSON.stringify(problem))
+      updateConstraintsWithMine(a, removed[0], removed[1])
+      const incompletePossibilites = getBoardProblemPossibilities(a, mines - 1, visibleTiles - 1, hiddenTiles)
+      for (const possibility of incompletePossibilites) {
+        console.log('p mine', JSON.parse(JSON.stringify(possibility)))
+        possibility.push([removed[0], removed[1], MINE])
+      }
+      possibilites = possibilites.concat(incompletePossibilites)
+    }
+    if (tileValid) {
+      const b = JSON.parse(JSON.stringify(problem))
+      updateConstraintsWithTileSmall(b, removed[0], removed[1])
+      const incompletePossibilites = getBoardProblemPossibilities(b, mines, visibleTiles - 1, hiddenTiles)
+      for (const possibility of incompletePossibilites) {
+        console.log('p tile', JSON.parse(JSON.stringify(possibility)))
+        possibility.push([removed[0], removed[1], TILE])
+      }
+      possibilites = possibilites.concat(incompletePossibilites)
+    }
+    console.log('passing off', JSON.parse(JSON.stringify(possibilites)))
+    return JSON.parse(JSON.stringify(possibilites))
+  }
+}
+
+// Turn a list of constraints into a list of lists of constraints. 
+// Each sublist (problem) much have contraints that all link up in some way.
+// Each problem has [depth] constraints inside it.
+// Note to future me: Hopefully you don't have to edit the below code ;)
+function getProblems(constraints, depth, banned={}, partialProblem=[]) {
+  const problems = []
+  if (depth === 0) {
+    problems.push(partialProblem)
+  } else if (partialProblem.length === 0) {
+    for (let i = 0; i < constraints.length; i++) {
+      const bans = {}
+      for (let j = 0; j <= i; j++) {
+        bans[j] = true
+      }
+      const newProblems = getProblems(constraints, depth - 1, bans, [constraints[i]])
+      for (const problem of newProblems)
+      problems.push(problem)
+    }
+  } else {
+    const tiles = []
+    for (const constraint of partialProblem) {
+      for (const newTile of constraint.variables) {
+        let good = true
+        for (const tile of tiles) {
+          if (tile[0] == newTile[0] && tile[1] == newTile[1]) {
+            good = false
+          }
+        }
+        if (good) {
+          tiles.push(newTile)
+        }
+      }
+    }
+    const newConstraints = []
+    for (let i = 0; i < constraints.length; i++) {
+      let good = false
+      for (const newTile of constraints[i].variables) {
+        for (const tile of tiles) {
+          if (tile[0] == newTile[0] && tile[1] == newTile[1]) {
+            good = true
+          }
+        }
+      }
+      good &&= !(i in banned)
+      if (good) {
+        newConstraints.push(i)
+      }
+    }
+    for (let i = 0; i < newConstraints.length; i++) {
+      const bans = Object.create(banned)
+      for (let j = 0; j <= i; j++) {
+        bans[newConstraints[j]] = true
+      }
+      const newProblem = Array.from(partialProblem)
+      newProblem.push(constraints[newConstraints[i]])
+      const newProblems = getProblems(constraints, depth - 1, bans, newProblem)
+      for (const problem of newProblems) {
+        problems.push(problem)
+      }
     }
   }
   return problems
