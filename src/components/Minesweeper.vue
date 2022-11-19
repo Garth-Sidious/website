@@ -291,6 +291,31 @@ function smartSetupIntermediate(game, clickedTile) {
   }
 }
 
+function smartSetupExpert(game, clickedTile) {
+  let testGame = {}
+  resetGame(testGame, 30, 16, 99, setupBoard)
+  clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
+  let usage = solveGameExpert(testGame)
+  let weightedUsage = 0
+  if (usage) {
+    weightedUsage = (usage[2] + usage[3])
+  }
+  while (weightedUsage < 2) {
+    resetGame(testGame, 30, 16, 99, setupBoard)
+    clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
+    usage = solveGameExpert(testGame)
+    weightedUsage = 0
+    if (usage) {
+      weightedUsage = (usage[2] + usage[3])
+    }
+  }
+  console.log(usage)
+  resetBoard(testGame.board)
+  for (let tile of allTiles(testGame.board)) {
+    game.board[tile.x][tile.y].value = tile.value
+  }
+}
+
 // Run a set of unit tests to make sure the various solvers work as intended
 function runUnitTests(game) {
   // Test extra mine marking
@@ -337,19 +362,19 @@ function runUnitTests(game) {
   runUnitTest(game, solveGameIntermediate, ["OCCMM", "CCCCM", "MCMCC", "MCCCC"], ["OOOMM","OOOCM","XOXOC","MCCCC"])
 
   // triple overlap
-  runUnitTest(game, solveGameExpert, ["OCCMM", "CCCCM", "MMCCC", "CMCCC"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
-  // ??? (awful) (quad overlap???) 
-  //runUnitTest(game, solveGameExpert, ["OCCCM", "CCCMM", "MCCCC", "MMCMC"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
+  runUnitTest(game, solveGameExpert, ["OCCMM", "CCCCM", "MMCCC", "CMCCC"], ["OOOXX", "OOOOX", "XXOOO", "OXOOO"])
+  // ??? (awful) (quad overlap???) expert shouldn't solve this
+  runUnitTest(game, solveGameExpert, ["OCCCM", "CCCMM", "MCCCC", "MMCMC"], ["OOOCX", "OOOMM", "XOOOC", "MXCXC"])
   // wire
-  //runUnitTest(game, solveGameExpert, ["OCCCC", "CCCCC", "MCCMC", "MMCCM"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
+  runUnitTest(game, solveGameExpert, ["OCCCC", "CCCCC", "MCCMC", "MMCCM"], ["OOOOO", "OOOOO", "MCOMC", "XMCCX"])
   // wire
-  //runUnitTest(game, solveGameExpert, ["OCCCM", "CCCCC", "MCCMC", "MMCCM"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
+  runUnitTest(game, solveGameExpert, ["OCCCM", "CCCCC", "MCCMC", "MMCCM"], ["OOOOM", "OOOOC", "MCOMC", "XMCCX"])
   // another wire
-  //runUnitTest(game, solveGameExpert, ["OCCCM", "CCCCM", "MCCMC", "MMCCM"], ["OOOOO", "OOOXX", "XOOOO", "XOXOO"])
+  runUnitTest(game, solveGameExpert, ["OCCCM", "CCCCM", "MCCMC", "MMCCM"], ["OOOOX", "OOOOX", "MCOMC", "XMCCX"])
 
-  // fails 5! unique boards on 5-4-0-0
+  // fails no! unique boards on 5-4-0-0
   //let testGame = {}
-  //runAllTests(testGame, solveGameExpert, 5, 4, 0, 0)
+  //runAllTests(testGame, solveGameExpert, 5, 5, 0, 0)
 
   // double board effect demo for users
   //runUnitTest(game, solveGameCustom([]), ["CCCMM", "CCCCM", "MMCCC", "CMCCC"], [])
@@ -561,10 +586,11 @@ function microNeighbours(micro, tile, width) {
 }
 
 function runSolverTests(game) {
-  let count = 100
+  let count = 1000
   //6536 1764 625 1075 beginner
   //2441 3541 934 3084 intermediate
-  //6 934 453 8607 expert
+  //6 934 453 8607 expert-
+  // REAL EXPERT DATA AT 4 (out of 100000): 1800 3, 136 33, 615 4, 115 43, the rest insignificant
   const results = []
   const testGame = {} 
   console.time('10k iterations')
@@ -1173,7 +1199,7 @@ function solveConstraints(game, constraints, depth) {
     }
   }
   // This is bad code, but to be honest I'm kind of tired of looking at it. Future me, you're in trouble!
-  if (depth > 1) {
+  if (constraints.length <= 10) {
     const boardProblems = getBoardProblems(constraints, depth - 1)
     for (const problem of boardProblems) {
       let newSolves = solveBoardProblem(game, problem)
@@ -1279,7 +1305,7 @@ function solveBoardProblem(game, problem) {
           good = false
         }
       }
-      hingeTiles.push(variable)
+      if (good) hingeTiles.push(variable)
     }
   }
   const possibilites = getBoardProblemPossibilities(problem, game.minesLeft, hingeTiles.length, game.tilesLeft - hingeTiles.length + game.minesLeft)
@@ -1299,7 +1325,7 @@ function solveBoardProblem(game, problem) {
           if (!tile.open && !tile.marked) {
             let good = true
             for (const hingeTile of hingeTiles) {
-              good = good && !(hingeTile[0] === tile.x && hingeTile[1] === tile.y)
+              good &&= !(hingeTile[0] === tile.x && hingeTile[1] === tile.y)
             }
             if (good) {
               solves.push([tile.x, tile.y, value[2]])
@@ -1428,40 +1454,22 @@ function getProblems(constraints, depth, banned={}, partialProblem=[]) {
 }
 
 // Turn a list of constraints into a list of lists of constraints. 
-// Each sublist (problem) much have contraints BUT THEY DON'T HAVE TO LINK UP (not done)
+// Each sublist (problem) much have contraints BUT THEY DON'T HAVE TO LINK UP
 // Each problem has [depth] constraints inside it.
-// Note to future me: Hopefully you don't have to edit the below code ;)
-function getBoardProblems(constraints, depth, banned={}, partialProblem=[]) {
-  const problems = []
+function getBoardProblems(constraints, depth, position=0) {
   if (depth === 0) {
-    problems.push(partialProblem)
-  } else if (partialProblem.length === 0) {
-    for (let i = 0; i < constraints.length; i++) {
-      const bans = {}
-      for (let j = 0; j <= i; j++) {
-        bans[j] = true
-      }
-      const newProblems = getProblems(constraints, depth - 1, bans, [constraints[i]])
-      for (const problem of newProblems)
-      problems.push(problem)
-    }
+    return [[]]
   } else {
-    for (let i = 0; i < constraints.length; i++) {
-      if (!(i in banned)) {
-        const bans = Object.create(banned)
-        for (let j = 0; j <= i; j++) {
-          bans[j] = true
-        }
-        const newProblem = Array.from(partialProblem)
-        newProblem.push(constraints[i])
-        const newProblems = getProblems(constraints, depth - 1, bans, newProblem)
-        for (const problem of newProblems) {
-          problems.push(problem)
-        }
+    const problems = []
+    for (let i = position; i < constraints.length; i++) {
+      const partialProblems = getBoardProblems(constraints, depth - 1, i + 1)
+      for (const problem of partialProblems) {
+        problem.push(constraints[i])
+        problems.push(problem)
       }
     }
+    return problems
   }
-  return problems
 }
 
 // Updates a list of constraints by changing the tile (x, y) to be a mine.
@@ -1550,7 +1558,7 @@ function updateConstraintsWithTile(constraints, game, x, y) {
   <h4 id="minesweeper-mines-left-display">Mines Left: {{ mainGame.minesLeft }}</h4>
   <button @click="resetGame(mainGame, 9, 9, 10, smartSetupBeginner)" id="minesweeper-new-game-button">New Beginner Game</button>
   <button @click="resetGame(mainGame, 16, 16, 40, smartSetupIntermediate)" id="minesweeper-new-game-button">New Intermediate Game</button>
-  <button @click="resetGame(mainGame, 30, 16, 99, setupBoard)" id="minesweeper-new-game-button">New Expert Game</button>
+  <button @click="resetGame(mainGame, 30, 16, 99, smartSetupExpert)" id="minesweeper-new-game-button">New Expert Game</button>
   <button @click="runUnitTests(mainGame)" id="minesweeper-new-game-button">Tests (For Dev Use)</button>
   <button @click="runSolverTests(mainGame)" id="minesweeper-new-game-button">Autosolve (For Dev Use)</button>
   <h2 v-if="mainGame.state === 'won'">You Won! B)</h2>
