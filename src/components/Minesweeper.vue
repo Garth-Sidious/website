@@ -7,7 +7,7 @@ const UNKNOWN = 2
 const HIDDEN_TILES = -1
 
 // Game states: setup (board displayed but not filled with mines), playing, won, lost
-let mainGame = reactive({})
+const mainGame = reactive({})
 resetGame(mainGame, 9, 9, 10, smartSetupBeginner)
 
 // Gets the 8 (or sometimes less) neighbours of a tile, given a board and a tile.
@@ -379,6 +379,15 @@ function runUnitTests(game) {
   // double board effect demo for users
   //runUnitTest(game, solveGameCustom([]), ["CCCMM", "CCCCM", "MMCCC", "CMCCC"], [])
 
+  // good runUnitTest(game, solveGameCustom([]), ["CCCCMCC", "CCMCMCM", "CCCCCCM", "CCCCCCC", "CMMCCCC", "CCCCCCM", "CCMMCCC"], [])
+  // good runUnitTest(game, solveGameCustom([]), [ "CCCCCCC", "CCMCMCM", "CCCCCMC", "CCCCMMC", "MCMCCCC", "CCCCCCC", "CCCMCCM" ], [])
+  // good runUnitTest(game, solveGameCustom([]), [ "CCCCCMC", "CCMCCCC", "CCCCMCM", "CCCMCCC", "MCCCCMM", "CCCCCCC", "CMCMCCC" ], [])
+
+  // 03, good runUnitTest(game, solveGameCustom([]), [ "CCCCMCM", "CCMMCCM", "CCCCMCC", "CCMMCCC", "CCMCCMC", "CCCCCCC", "CCCCCCC" ], [])
+
+  // 22, VERY HARD runUnitTest(game, solveGameCustom([]), [ "CCCCCMC", "CCCCCCC", "MCCMCCC", "CCCCCMC", "MCCCMCC", "CMCMCCM", "MCCCCCC" ], [])
+
+  clickTile(game, game.board[0][0])
 }
 
 // Run a single unit test to make sure the various solvers work as intended
@@ -586,7 +595,7 @@ function microNeighbours(micro, tile, width) {
 }
 
 function runSolverTests(game) {
-  let count = 1000
+  let count = 10000
   //6536 1764 625 1075 beginner
   //2441 3541 934 3084 intermediate
   //6 934 453 8607 expert-
@@ -598,18 +607,27 @@ function runSolverTests(game) {
     if (i % 100 === 0) {
       console.log(i)
     }
-    resetGame(testGame, 30, 16, 99, setupBoard)
-    clickTile(testGame, testGame.board[4][4])
+    resetGame(testGame, 7, 7, 10, setupBoard)
+    clickTile(testGame, testGame.board[0][0])
     const usage = solveGameExpert(testGame)
     if (usage) {
       usage.reverse()
     }
     results.push(usage)
+    if (usage && usage[0] + usage[1] >= 3) {
+      console.log(usage)
+      const mini = gameToMini(testGame)
+      for (let i = 0; i < mini.length; i++) {
+        mini[i] = mini[i].replaceAll('O', 'C').replaceAll('X', 'M')
+      }
+      console.log(mini)
+    }
+
   }
   console.timeEnd('10k iterations')
   results.sort()
   console.log(results)
-  resetGame(game, 30, 16, 99, setupBoard)
+  resetGame(game, 7, 7, 10, setupBoard)
   game.board = testGame.board
   game.tilesLeft = testGame.tilesLeft
   game.markedTiles = testGame.markedTiles
@@ -649,11 +667,6 @@ function solveGameCustom(functions) {
     return
   }
 }
-
-//Solve a game board with expert strategies.
-//const solveGameExpert = solveGameCustom([trivialSolver, dominationSolver, avoidanceSolver, 
-//  supplySolver, doubleBindSolver, bindSupplySolver, doubleBindSupplySolver, overlapDoubleBindSupplySolver])
-
 
 // Solves a specific tile of a minesweeper game with trivial methods.
 // Specifically, if a tile has no mines left to mark around it, open all other tiles next to it,
@@ -751,39 +764,6 @@ function getBinds(game, tile) {
   return binds
 }
 
-// Get all double binds for a game given that game and a tile.
-// A double bind is a tile which has two bindings with no overlap in joint.
-function getDoubleBinds(game, tile) {
-  let doubleBinds = []
-  let binds = getBinds(game, tile)
-  for (let i = 0; i < binds.length; i++) {
-    for (let j = 0; j < i; j++) {
-      let fullArray = binds[i].joint.concat(binds[j].joint, binds[i].bindTiles, binds[j].bindTiles)
-      let seen = new Set();
-      const hasDuplicates = fullArray.some(function(currentObject) {
-        return seen.size === seen.add(currentObject).size;
-      });
-      if (!hasDuplicates) {
-        let doubleBind = {}
-        doubleBind.self = tile
-        doubleBind.selfMines = binds[i].selfMines
-        // Interesection of binds[i].selfTiles and binds[j].selfTiles
-        doubleBind.selfTiles = binds[i].selfTiles.filter(value => binds[j].selfTiles.includes(value));
-        doubleBind.a = binds[i].bind
-        doubleBind.aMines = binds[i].bindMines
-        doubleBind.aTiles = binds[i].bindTiles
-        doubleBind.aJoint = binds[i].joint
-        doubleBind.b = binds[j].bind
-        doubleBind.bMines = binds[j].bindMines
-        doubleBind.bTiles = binds[j].bindTiles
-        doubleBind.bJoint = binds[j].joint
-        doubleBinds.push(doubleBind)
-      }
-    }
-  }
-  return doubleBinds
-}
-
 function getBoardBinds(game) {
   let binds = []
   let closedTiles = []
@@ -858,153 +838,6 @@ function supplySolver(game, frontier) {
     }
   }
   return true
-}
-
-function doubleBindSolver(game, frontier, tile) {
-  let discovered = false
-  for (let bind of getDoubleBinds(game, tile)) {
-    if (bind.aMines + bind.bMines + bind.selfTiles.length === bind.selfMines) {
-      clickAllAndPushToFrontier(game, bind.aTiles, frontier)
-      clickAllAndPushToFrontier(game, bind.bTiles, frontier)
-      markAllAndPushToFrontier(game, bind.selfTiles, frontier)
-      discovered = discovered || bind.aTiles.length > 0 || bind.bTiles.length > 0 || bind.selfTiles.length > 0
-    }
-    if (bind.aMines - bind.aTiles.length + bind.bMines - bind.bTiles.length === bind.selfMines) {
-      markAllAndPushToFrontier(game, bind.aTiles, frontier)
-      markAllAndPushToFrontier(game, bind.bTiles, frontier)
-      clickAllAndPushToFrontier(game, bind.selfTiles, frontier)
-      discovered = discovered || bind.aTiles.length > 0 || bind.bTiles.length > 0 || bind.selfTiles.length > 0
-    }
-  }
-  return discovered
-}
-
-function bindSupplySolver(game, frontier) {
-  if (game.minesLeft <= 5 || game.minesLeft >= game.tilesLeft - 5) {
-    if (dominationSolver(game, frontier, 'board')) {
-      return true
-    }
-    if (avoidanceSolver(game, frontier, 'board')) {
-      return true
-    }
-  }
-  return false
-}
-
-function doubleBindSupplySolver(game, frontier) {
-  if (game.minesLeft <= 10 || game.minesLeft >= game.tilesLeft - 10) {
-    let doubleBinds = []
-    let binds = getBoardBinds(game)
-    for (let i = 0; i < binds.length; i++) {
-      for (let j = 0; j < i; j++) {
-        let fullArray = binds[i].joint.concat(binds[j].joint)
-        let seen = new Set();
-        const hasDuplicates = fullArray.some(function(currentObject) {
-          return seen.size === seen.add(currentObject).size;
-        });
-        if (!hasDuplicates) {
-          let doubleBind = {}
-          doubleBind.selfTiles = binds[i].selfTiles.filter(value => binds[j].selfTiles.includes(value));
-          doubleBind.a = binds[i].bind
-          doubleBind.aMines = binds[i].bindMines
-          doubleBind.aJoint = binds[i].joint
-          doubleBind.b = binds[j].bind
-          doubleBind.bMines = binds[j].bindMines
-          doubleBind.bJoint = binds[j].joint
-          doubleBinds.push(doubleBind)
-        }
-      }
-    }
-    for (let bind of doubleBinds) {
-      if (bind.bMines + bind.aMines === game.minesLeft) {
-        clickAllAndPushToFrontier(game, bind.selfTiles, frontier)
-        if (bind.selfTiles.length > 0) {
-          return true
-        }
-      }
-      if (bind.selfTiles.length + bind.aMines + bind.bMines === game.minesLeft) {
-        markAllAndPushToFrontier(game, bind.selfTiles, frontier)
-        if (bind.selfTiles.length > 0) {
-          return true
-        }
-      }
-    }
-  }
-  return false
-}
-
-// I need to clean up my code, the below code is scary
-function overlapDoubleBindSupplySolver(game, frontier) {
-  if (game.minesLeft <= 10 || game.minesLeft >= game.tilesLeft - 10) {
-    let doubleBinds = []
-    let binds = getBoardBinds(game)
-    for (let i = 0; i < binds.length; i++) {
-      for (let j = 0; j < i; j++) {
-
-        let aJoint = []
-        let bJoint = []
-        let doubleJoint = []
-        for (let aTile of binds[i].joint) {
-          for (let bTile of binds[j].joint) {
-            if (aTile === bTile) {
-              doubleJoint.push(aTile)
-            }
-          }
-        }
-        for (let aTile of binds[i].joint) {
-          let inJoint = false
-          for (let jointTile of doubleJoint) {
-            if (aTile === jointTile) {
-              inJoint = true
-            }
-          }
-          if (!inJoint) {
-            aJoint.push(aTile)
-          }
-        }
-        for (let bTile of binds[j].joint) {
-          let inJoint = false
-          for (let jointTile of doubleJoint) {
-            if (bTile === jointTile) {
-              inJoint = true
-            }
-          }
-          if (!inJoint) {
-            bJoint.push(bTile)
-          }
-        }
-        if (doubleJoint.length > 0 && aJoint.length > 0 && bJoint.length > 0) {
-          let doubleBind = {}
-          doubleBind.selfTiles = binds[i].selfTiles.filter(value => binds[j].selfTiles.includes(value));
-          doubleBind.a = binds[i].bind
-          doubleBind.aMines = binds[i].bindMines
-          doubleBind.aJoint = aJoint
-          doubleBind.b = binds[j].bind
-          doubleBind.bMines = binds[j].bindMines
-          doubleBind.bJoint = bJoint
-          doubleBind.abJoint = doubleJoint
-          doubleBinds.push(doubleBind)
-        }
-      }
-    }
-    for (let bind of doubleBinds) {
-      if (bind.bMines + bind.aMines + bind.selfTiles.length === game.minesLeft) {
-        clickAllAndPushToFrontier(game, bind.abJoint, frontier)
-        markAllAndPushToFrontier(game, bind.selfTiles, frontier)
-        if (bind.selfTiles.length > 0 || bind.abJoint.length > 0) {
-          return true
-        }
-      }
-      if (bind.bMines + bind.aMines - bind.abJoint.length === game.minesLeft) {
-        markAllAndPushToFrontier(game, bind.abJoint, frontier)
-        clickAllAndPushToFrontier(game, bind.selfTiles, frontier)
-        if (bind.selfTiles.length > 0 || bind.abJoint.length > 0) {
-          return true
-        }
-      }
-    }
-  }
-  return false
 }
 
 function clickAllAndPushToFrontier(game, tiles, frontier) {
@@ -1126,27 +959,30 @@ class MultiFrontier {
 
 // Solves a game with expert strategies.
 // Represents the board as a set of constraint satisfaction problems (CSPs).
-function solveGameExpert(game) {
-  const DEPTH = 4
-  let constraints = getConstraints(game)
-  let currentDepth = 0
-  let logic = Array(DEPTH).fill(0);
-  while (currentDepth < DEPTH) {
-    const constraintsSolved = solveConstraints(game, constraints, currentDepth + 1)
-    if (constraintsSolved) {
-      logic[currentDepth] += 1
-      currentDepth = 0
-    } else {
-      currentDepth += 1
+function solveGameExpertCustom(depth) {
+  return function solveGameCustomDepth(game) {
+    let constraints = getConstraints(game)
+    let currentDepth = 0
+    let logic = Array(depth).fill(0);
+    while (currentDepth < depth) {
+      const constraintsSolved = solveConstraints(game, constraints, currentDepth + 1)
+      if (constraintsSolved) {
+        logic[currentDepth] += 1
+        currentDepth = 0
+      } else {
+        currentDepth += 1
+      }
+    }
+    if (game.state === 'won') {
+      return logic
+    }
+    else {
+      return null
     }
   }
-  if (game.state === 'won') {
-    return logic
-  }
-  else {
-    return null
-  }
 }
+
+const solveGameExpert = solveGameExpertCustom(4)
 
 // Gets a set of contraints which each represent a piece of information about the board.
 function getConstraints(game) {
@@ -1559,8 +1395,8 @@ function updateConstraintsWithTile(constraints, game, x, y) {
   <button @click="resetGame(mainGame, 9, 9, 10, smartSetupBeginner)" id="minesweeper-new-game-button">New Beginner Game</button>
   <button @click="resetGame(mainGame, 16, 16, 40, smartSetupIntermediate)" id="minesweeper-new-game-button">New Intermediate Game</button>
   <button @click="resetGame(mainGame, 30, 16, 99, smartSetupExpert)" id="minesweeper-new-game-button">New Expert Game</button>
-  <button @click="runUnitTests(mainGame)" id="minesweeper-new-game-button">Tests (For Dev Use)</button>
-  <button @click="runSolverTests(mainGame)" id="minesweeper-new-game-button">Autosolve (For Dev Use)</button>
+  <!-- button @click="runUnitTests(mainGame)" id="minesweeper-new-game-button">Tests (For Dev Use)</button>
+  <button @click="runSolverTests(mainGame)" id="minesweeper-new-game-button">Autosolve (For Dev Use)</button -->
   <h2 v-if="mainGame.state === 'won'">You Won! B)</h2>
   <h2 v-if="mainGame.state === 'lost'">You Lost :(</h2>
 </template>
