@@ -1430,9 +1430,11 @@ function updateConstraintsWithTile(constraints, game, x, y) {
 
 .minesweeper-button-text {
   font-weight: bold;
-  font-size: 22px;
-  top: -4px;
-  left: -1px;
+  font-size: 25px;
+  font-family: Arial, Helvetica, sans-serif;
+  top: -3px;
+  left: 4px;
+  position: absolute;
 }
 
 .minesweeper-button-text.m1 {
@@ -1467,7 +1469,7 @@ function updateConstraintsWithTile(constraints, game, x, y) {
 }
 
 .minesweeper-button.inactive {
-  border-bottom-color: #7B7B7B;
+  border-bottom-color: #1e1c1c;
   border-right-color: #7B7B7B;
   border-left-color: white;
   border-top-color: white;
@@ -1495,20 +1497,24 @@ function updateConstraintsWithTile(constraints, game, x, y) {
 }
 
 .minesweeper-flag {
-  width: 120%;
+  width: 15px;
   height: auto;
-  top: 1px;
-  left: -1px;
+  position: absolute;
+  right: 2.5px;
+  top: 2.5px;
 }
 .minesweeper-bomb {
-  width: 130%;
+  width: 20px;
   height: auto;
-  left: -2px;
+  position: absolute;
+  right: 1px;
+  top: 1px;
 }
 
 .minesweeper-button.mE {
   background-color: red;
-  border: none;
+  border-width: 1px;
+  border-color: red;
 }
 
 
