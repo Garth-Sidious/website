@@ -1461,13 +1461,14 @@ function updateConstraintsWithTile(constraints, game, x, y) {
 .minesweeper-button-text.m8 {
   color: #7B7B7B;
 }
-
 .minesweeper-button.active {
   border-width: 1px;
   border-color: #BDBDBD;
   background-color: #BDBDBD;
 }
-
+.minesweeper-button:focus {
+  outline:0;
+}
 .minesweeper-button.inactive {
   border-bottom-color: #1e1c1c;
   border-right-color: #7B7B7B;
