@@ -1405,6 +1405,7 @@ function updateConstraintsWithTile(constraints, game, x, y) {
 
 #minesweeper-header {
   text-align: center;
+  margin-top: 10px;
 }
 
 #minesweeper-container {
@@ -1432,7 +1433,7 @@ function updateConstraintsWithTile(constraints, game, x, y) {
   font-weight: bold;
   font-size: 25px;
   font-family: Arial, Helvetica, sans-serif;
-  top: -3px;
+  top: -8px;
   left: 4px;
   position: absolute;
 }
