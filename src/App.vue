@@ -1,13 +1,15 @@
 <script setup>
 import { ref, computed } from 'vue'
 import Minesweeper from './components/Minesweeper.vue';
+import Chromatica from './components/Chromatica.vue';
 import Screensaver from './components/Screensaver.vue';
 import NotFound from './components/NotFound.vue';
 import "bootstrap/dist/css/bootstrap.min.css"
 import "bootstrap"
 
 const routes = {
-  '/': { view: Minesweeper, text: 'Minesweeper' },
+  '/': { view: Chromatica, text: 'Chromatica' },
+  '/minesweeper': { view: Minesweeper, text: 'Minesweeper' },
   '/screensaver': { view: Screensaver, text: 'Screensaver' }
 }
 
