@@ -56,7 +56,12 @@ function drawBoard(gameState) {
   for (let i = 0; i < 6; i++) {
     let x = boardSize / 2 + baseSize * Math.cos((1 + 2 * i) * Math.PI / 6);
     let y = boardSize / 2 + baseSize * Math.sin((1 + 2 * i) * Math.PI / 6);
-    drawHomeBase(hexSize, x, y, -2 + 2 * i, colors[i + 1]);
+    drawHomeBase(x, y, -2 + 2 * i, colors[i + 1]);
+  }
+  for (let i = 0; i < 6; i++) {
+    let x = boardSize / 2 + 7.7 * hexGlue * Math.cos((2 * i) * Math.PI / 6);
+    let y = boardSize / 2 + 7.7 * hexGlue * Math.sin((2 * i) * Math.PI / 6);
+    drawArrow(x, y, 2 * i, colors[0]);
   }
 }
 
@@ -73,7 +78,7 @@ function drawHex(size, x, y, color) {
   ctx.fill();
 }
 
-function drawHomeBase(size, x, y, rotation, color) {
+function drawHomeBase(x, y, rotation, color) {
   let bonusSize =  2 * (hexGlue / Math.cos(Math.PI / 6) - hexSize);
   let trickySize = bonusSize * Math.sin(Math.PI / 6) + hexSize;
   let finalSize = trickySize * Math.cos(Math.PI / 6) * 2;
@@ -85,6 +90,21 @@ function drawHomeBase(size, x, y, rotation, color) {
   ctx.lineTo(x + trickySize * Math.cos((3 + rotation) * Math.PI / 6), y + trickySize * Math.sin((3 + rotation) * Math.PI / 6));  
   ctx.lineTo(x + finalSize * Math.cos((6 + rotation) * Math.PI / 6), y + finalSize * Math.sin((6 + rotation) * Math.PI / 6));  
   ctx.lineTo(x + trickySize * Math.cos((7 + rotation) * Math.PI / 6), y + trickySize * Math.sin((7 + rotation) * Math.PI / 6));  
+
+  ctx.fillStyle = color;
+  ctx.lineWidth = 1;
+  ctx.fill();
+}
+
+function drawArrow(x, y, rotation, color) {
+  let size = hexSize / 4;
+
+  ctx.beginPath();
+  ctx.moveTo(x + size * Math.cos((0 + rotation) * Math.PI / 6), y + size * Math.sin((0 + rotation) * Math.PI / 6));  
+  ctx.lineTo(x + size * Math.cos((2 + rotation) * Math.PI / 6), y + size * Math.sin((2 + rotation) * Math.PI / 6));  
+  ctx.lineTo(x + size * Math.cos((4 + rotation) * Math.PI / 6), y + size * Math.sin((4 + rotation) * Math.PI / 6));  
+  ctx.lineTo(x + size * Math.cos((6 + rotation) * Math.PI / 6), y + size * Math.sin((6 + rotation) * Math.PI / 6)); 
+  ctx.lineTo(x + size * 2 * Math.cos(Math.PI / 6) * Math.cos((9 + rotation) * Math.PI / 6), y + size * 2 * Math.cos(Math.PI / 6) * Math.sin((9 + rotation) * Math.PI / 6));  
 
   ctx.fillStyle = color;
   ctx.lineWidth = 1;
