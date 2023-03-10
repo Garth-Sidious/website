@@ -17,7 +17,6 @@ onMounted(() => {
 })
 
 window.onresize = () => {
-  console.log('resize!')
   setBoardSize();
   drawChromatica(exampleBoard);
 }
@@ -28,7 +27,6 @@ function setBoardSize() {
   hexGlue = hexSize * 0.95;
 }
 function drawChromatica(gameState) {
-  console.log(gameState)
   ctx.canvas.width  = boardSize;
   ctx.canvas.height = boardSize;
   ctx.beginPath();
