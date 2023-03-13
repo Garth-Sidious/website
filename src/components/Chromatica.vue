@@ -8,11 +8,23 @@ let hexGlue;
 let ctx;
 
 const exampleBoard = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 4, 4, 4, 4, 0, 0, 0, 3, 0, 0, 0, 0, 5, 0, 0, 0, 6, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+let clickPos = null
+
+function setHighlight(canvas, event) {
+    const rect = canvas.getBoundingClientRect()
+    const x = event.clientX - rect.left
+    const y = event.clientY - rect.top
+    clickPos = [x / boardSize, y / boardSize]
+    drawChromatica(exampleBoard);
+}
 
 onMounted(() => {
   const chromatica = document.getElementById("chromatica");
   ctx = chromatica.getContext("2d");
   setBoardSize();
+  chromatica.addEventListener('mousedown', function(e) {
+    setHighlight(chromatica, e)
+  })
   drawChromatica(exampleBoard);
 })
 
@@ -61,6 +73,8 @@ function drawBoard(gameState) {
     let y = boardSize / 2 + 7.7 * hexGlue * Math.sin((2 * i) * Math.PI / 6);
     drawArrow(x, y, 2 * i, colors[0]);
   }
+  if (clickPos) drawHex(hexSize / 2, clickPos[0] * boardSize, clickPos[1] * boardSize, '#000')
+  else console.log(clickPos)
 }
 
 function drawHex(size, x, y, color) {
