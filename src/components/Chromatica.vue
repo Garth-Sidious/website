@@ -2,6 +2,7 @@
 import { onMounted } from 'vue';
 
 const colors = ["#eed", "#d2d", "#f22", "#dd2", "#2f2", "#2dd", "#22f"];
+const highlightColors = ["#bb9", "#808", "#900", "#770", "#090", "#077", "#00b"];
 let boardSize;
 let hexSize;
 let hexGlue;
@@ -10,11 +11,32 @@ let ctx;
 const exampleBoard = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 4, 4, 4, 4, 0, 0, 0, 3, 0, 0, 0, 0, 5, 0, 0, 0, 6, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 let clickPos = null
 
-function setHighlight(canvas, event) {
+function setHighlight(canvas, gameState, event) {
     const rect = canvas.getBoundingClientRect()
-    const x = event.clientX - rect.left
-    const y = event.clientY - rect.top
-    clickPos = [x / boardSize, y / boardSize]
+    const x = (event.clientX - rect.left)
+    const y = (event.clientY - rect.top)
+    for (let i = -4; i <= 4; i += 1) {
+      for (let j = -4; j <= 4; j += 1) { 
+        let k = -i - j;
+        if (Math.abs(i) + Math.abs(j) + Math.abs(k) < 8 || (Math.abs(i) + Math.abs(j) + Math.abs(k) === 8 && i && j && k)) {
+          const sizejk = boardSize / 2 + (j - k) * hexGlue * Math.sqrt((3 + 2 * Math.SQRT2) / 6) 
+          const djk = Math.abs(sizejk - x);
+          const sizeij = boardSize / 2 + (j - i) * hexGlue * Math.sqrt((3 + 2 * Math.SQRT2) / 6) 
+          const xprime = (x - boardSize / 2) * Math.cos(Math.PI / 3) - (y  - boardSize / 2) * Math.sin(Math.PI / 3) + boardSize / 2
+          const dij = Math.abs(sizeij - xprime);
+          const sizeik = boardSize / 2 + (i - k) * hexGlue * Math.sqrt((3 + 2 * Math.SQRT2) / 6) 
+          const xprime2 = (x - boardSize / 2) * Math.cos(-Math.PI / 3) - (y  - boardSize / 2) * Math.sin(-Math.PI / 3) + boardSize / 2
+          const dik = Math.abs(sizeik - xprime2);
+          const hsize = hexSize * Math.sqrt(3) / 2
+          if (djk < hsize && dij < hsize && dik < hsize && gameState[i + 4 + 9 * (j + 4)]) {
+            clickPos = [i, j, k]
+            drawChromatica(exampleBoard)
+            return
+          }
+        }
+      }
+    }
+    clickPos = null
     drawChromatica(exampleBoard);
 }
 
@@ -23,7 +45,7 @@ onMounted(() => {
   ctx = chromatica.getContext("2d");
   setBoardSize();
   chromatica.addEventListener('mousedown', function(e) {
-    setHighlight(chromatica, e)
+    setHighlight(chromatica, exampleBoard, e)
   })
   drawChromatica(exampleBoard);
 })
@@ -56,7 +78,12 @@ function drawBoard(gameState) {
         const x = boardSize / 2 + (j - k) * hexGlue * Math.sqrt((3 + 2 * Math.SQRT2) / 6);
         const y = boardSize / 2 + i * hexGlue * (1 + Math.SQRT1_2)
         const boardInfo = gameState[i + 4 + 9 * (j + 4)]
-        drawHex(hexSize, x, y, colors[boardInfo]);
+        if (clickPos && clickPos[0] === i && clickPos[1] === j && clickPos[2] === k) {
+          drawHex(hexSize, x, y, highlightColors[boardInfo]);
+          drawHex(hexSize * 0.8, x, y, colors[boardInfo]);
+        } else {
+          drawHex(hexSize, x, y, colors[boardInfo]);
+        }
       }
     }
   }
@@ -73,8 +100,6 @@ function drawBoard(gameState) {
     let y = boardSize / 2 + 7.7 * hexGlue * Math.sin((2 * i) * Math.PI / 6);
     drawArrow(x, y, 2 * i, colors[0]);
   }
-  if (clickPos) drawHex(hexSize / 2, clickPos[0] * boardSize, clickPos[1] * boardSize, '#000')
-  else console.log(clickPos)
 }
 
 function drawHex(size, x, y, color) {
