@@ -1,8 +1,8 @@
 <script setup>
 import { onMounted } from 'vue';
 
-const colors = ["#eed", "#d2d", "#f22", "#dd2", "#2d2", "#2dd", "#22f"];
-const highlightColors = ["#bb9", "#808", "#900", "#770", "#090", "#077", "#00b"];
+const colors = ["#eed", "#d2d", "#f22", "#db2", "#2d2", "#2dd", "#22f"];
+const highlightColors = ["#bb9", "#808", "#900", "#860", "#090", "#077", "#00b"];
 let boardSize;
 let hexSize;
 let hexGlue;
@@ -28,12 +28,31 @@ function array_includes(array, item) {
 }
 
 function canMove(i, j, k, clickPos, board) {
-  // can move if:
-  // diff from click is equal in two
-  // diff is less than 4
+  if (clickPos === null) return false
+  const idiff = clickPos[0] - i
+  const jdiff = clickPos[1] - j
+  const kdiff = clickPos[2] - k
+  if (idiff === 0 && jdiff == 0 && kdiff == 0) return false
+  if (idiff === -jdiff) {
+    if (Math.abs(idiff) < 4) {
+      return true
+    }
+  }
+  if (idiff === -kdiff) {
+    if (Math.abs(idiff) < 4) {
+      return true
+    }
+  }
+  if (jdiff === -kdiff) {
+    if (Math.abs(jdiff) < 4) {
+      return true
+    }
+  }
+  // TODO:
   // no blocking cell
   // no cell (unless capturable)
   // not glued (unless moving away)
+  // have energy left
   return false
 }
 
@@ -47,9 +66,11 @@ const PRIMARY_BASES = [...RED_BASE, ...GREEN_BASE, ...BLUE_BASE]
 const SECONDARY_BASES = [...YELLOW_BASE, ...CYAN_BASE, ...MAGENTA_BASE]
 const ALL_BASES = [MAGENTA_BASE, RED_BASE, YELLOW_BASE, GREEN_BASE, CYAN_BASE, BLUE_BASE]
 function canSpawn(i, j, turn, board) {
+  // TODO 
+  // energy left
+  // turns (done but disabled for now)
   if (board[i + 4 + 9 * (j + 4)] !== 0) return false
-  if (turn === Turns.Primary && array_includes(PRIMARY_BASES, [i, j]) ||
-      turn === Turns.Secondary && array_includes(SECONDARY_BASES, [i, j])) {
+  if (array_includes(PRIMARY_BASES, [i, j]) || array_includes(SECONDARY_BASES, [i, j])) {
     let base = null
     for (let n = 0; i < ALL_BASES.length; n++) {
       if (array_includes(ALL_BASES[n], [i, j])) {
@@ -59,19 +80,49 @@ function canSpawn(i, j, turn, board) {
     }
     return (board.filter(x => x === base).length < 3)
   }
+  // --CODE FOR TURNS--
+  // if (turn === Turns.Primary && array_includes(PRIMARY_BASES, [i, j]) ||
+  //     turn === Turns.Secondary && array_includes(SECONDARY_BASES, [i, j])) {
+  //   let base = null
+  //   for (let n = 0; i < ALL_BASES.length; n++) {
+  //     if (array_includes(ALL_BASES[n], [i, j])) {
+  //       base = n + 1
+  //       break
+  //     }
+  //   }
+  //   return (board.filter(x => x === base).length < 3)
+  // }
   return false
 }
 
-function spawnColor(i, j) {
+function spawnValue(i, j) {
   for (let n = 0; i < ALL_BASES.length; n++) {
     if (array_includes(ALL_BASES[n], [i, j])) {
-      return colors[n + 1]
+      return n + 1
     }
   }
-  return "#000" // should never happen
+  return 0 // should never happen
 }
 
-function setHighlight(canvas, gameState, event) {
+function spawnColor(i, j) {
+  return colors[spawnValue(i, j)]
+}
+
+function moveHex(i, j, board) {
+  console.log(i, j)
+  const hex = board[clickPos[0] + 4 + 9 * (clickPos[1] + 4)]
+  console.log(board)
+  board[i + 4 + 9 * (j + 4)] = hex
+  board[clickPos[0] + 4 + 9 * (clickPos[1] + 4)] = 0
+  console.log(board)
+  clickPos = null
+}
+
+function spawnHex(i, j, board) {
+  board[i + 4 + 9 * (j + 4)] = spawnValue(i, j)
+}
+
+function setHighlight(canvas, board, event) {
     const rect = canvas.getBoundingClientRect()
     const x = (event.clientX - rect.left)
     const y = (event.clientY - rect.top)
@@ -88,10 +139,16 @@ function setHighlight(canvas, gameState, event) {
           const xprime2 = (x - boardSize / 2) * Math.cos(-Math.PI / 3) - (y  - boardSize / 2) * Math.sin(-Math.PI / 3) + boardSize / 2
           const dik = Math.abs(sizeik - xprime2);
           const hsize = hexSize * Math.sqrt(3) / 2
-          if (djk < hsize && dij < hsize && dik < hsize && gameState[i + 4 + 9 * (j + 4)]) {
-            clickPos = [i, j, k]
-            drawChromatica(exampleBoard)
-            return
+          if (djk < hsize && dij < hsize && dik < hsize) {
+            if (clickPos && (canMove(i, j, k, clickPos, board))) {
+              moveHex(i, j, board)
+            } else if (canSpawn(i, j, turn, board)) {
+              spawnHex(i, j, board)
+            } else if (board[i + 4 + 9 * (j + 4)]) {
+              clickPos = [i, j, k]
+              drawChromatica(exampleBoard)
+              return
+            }
           }
         }
       }
