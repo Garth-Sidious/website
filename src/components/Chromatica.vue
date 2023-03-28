@@ -109,12 +109,9 @@ function spawnColor(i, j) {
 }
 
 function moveHex(i, j, board) {
-  console.log(i, j)
   const hex = board[clickPos[0] + 4 + 9 * (clickPos[1] + 4)]
-  console.log(board)
   board[i + 4 + 9 * (j + 4)] = hex
   board[clickPos[0] + 4 + 9 * (clickPos[1] + 4)] = 0
-  console.log(board)
   clickPos = null
 }
 
@@ -144,6 +141,8 @@ function setHighlight(canvas, board, event) {
               moveHex(i, j, board)
             } else if (canSpawn(i, j, turn, board)) {
               spawnHex(i, j, board)
+            } else if (clickPos) {
+              
             } else if (board[i + 4 + 9 * (j + 4)]) {
               clickPos = [i, j, k]
               drawChromatica(exampleBoard)
