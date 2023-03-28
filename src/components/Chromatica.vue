@@ -142,7 +142,9 @@ function setHighlight(canvas, board, event) {
             } else if (canSpawn(i, j, turn, board)) {
               spawnHex(i, j, board)
             } else if (clickPos) {
-              
+              clickPos = null
+              drawChromatica(exampleBoard)
+              return
             } else if (board[i + 4 + 9 * (j + 4)]) {
               clickPos = [i, j, k]
               drawChromatica(exampleBoard)
