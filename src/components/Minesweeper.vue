@@ -1,10 +1,15 @@
 <script setup>
 import { reactive } from 'vue'
+import { useCollection } from 'vuefire'
+import { highscoresRef } from '../firebase'
 
 const TILE = 0
 const MINE = 1
 const UNKNOWN = 2
 const HIDDEN_TILES = -1
+
+const highscores = useCollection(highscoresRef)
+console.log(highscores.data.value)
 
 // Game states: setup (board displayed but not filled with mines), playing, won, lost
 const mainGame = reactive({})
@@ -1373,6 +1378,10 @@ function updateConstraintsWithTile(constraints, game, x, y) {
 </script>
 
 <template>
+  ppp
+  <li v-for="highscore in highscores" :key="highscores.id">
+     <span>text is {{ highscore.text }}</span>
+    </li>
   <div style="display: none;">
     <img src="@/assets/flag.svg">
     <img src="@/assets/bomb.svg">
