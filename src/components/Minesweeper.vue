@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, computed } from 'vue'
+import { reactive, ref, computed } from 'vue'
 import { useCollection } from 'vuefire'
 import { highscoresRef, db } from '../firebase' 
 import { collection, addDoc, Timestamp } from "firebase/firestore"; 
@@ -11,19 +11,31 @@ const HIDDEN_TILES = -1
 
 const highscores = useCollection(highscoresRef)
 const sortedHighscores = computed(() => {
-  return highscores.data.value.sort((a, b) => a.score > b.score).slice(0, 5)
+  return highscores.data.value.filter(a => a.board === mainGame.boardName).sort((a, b) => a.score > b.score).slice(0, 5)
 })
 
 // Game states: setup (board displayed but not filled with mines), playing, won, lost
 const mainGame = reactive({})
 let timer = null
-resetGame(mainGame, 9, 9, 10, smartSetupBeginner)
+let displayTimer = ref(0)
+function updateDisplayTimer() {
+  if (mainGame.state === "playing") {
+    displayTimer.value = Math.floor((new Date().getTime() - timer) / 100)
+    setTimeout(updateDisplayTimer, 10)
+  }
+}
+let name = ref("")
+const vUppercase = {
+    updated: function (el) {
+        el.value = el.value.toUpperCase().replace(/[^A-Z ]/g, "").substring(0, 16)
+    }
+}
+resetGame(mainGame, 9, 9, 10, smartSetupBeginner, "beginner")
 
 function checkForHighscore() {
   if (timer === null) return
   const score = Math.floor((new Date().getTime() - timer) / 100)
   if (isLeaderboardScore(score)) {
-    console.log('gaming', score)
     requestLeaderboardEntry(score)
   }
 }
@@ -31,17 +43,17 @@ function checkForHighscore() {
 function isLeaderboardScore(score) {
   if (sortedHighscores.value.length < 5) return true
   const lowestScore = Math.max(...sortedHighscores.value.map(hs => hs.score))
-  console.log('gaming?', lowestScore)
   return (score < lowestScore)
 }
 
 async function requestLeaderboardEntry(score) {
+  const stripname =  name.value.toUpperCase().replace(/[^A-Z ]/g, "").substring(0, 16)
   try {
     await addDoc(collection(db, "highscores"), {
-      name: "anonymous",
+      name: stripname ? stripname : "ANONYMOUS",
       time: Timestamp.now(),
       score: score,
-      board: "beginner"
+      board: mainGame.boardName
     });
   } catch (e) {
     console.error("Error adding document: ", e);
@@ -199,7 +211,7 @@ function clickTile(game, tile, percolate = true) {
   }
 }
 
-function resetGame(game, width, height, mineCount, generator) {
+function resetGame(game, width, height, mineCount, generator, boardName) {
   game.board = blankBoard(width, height)
   game.state = 'setup'
   game.width = width
@@ -209,6 +221,7 @@ function resetGame(game, width, height, mineCount, generator) {
   game.markedTiles = 0
   game.minesLeft = mineCount
   game.generator = generator
+  game.boardName = boardName
 }
 
 //Reset the game to playing state, but keep the same board.
@@ -292,6 +305,7 @@ function gameToMini(game) {
 //Also for use in always generating solvable boards.
 function smartSetupBeginner(game, clickedTile) {
   timer = null
+  displayTimer.value = 0
   let testGame = {}
   resetGame(testGame, 9, 9, 10, setupBoard)
   clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
@@ -303,6 +317,7 @@ function smartSetupBeginner(game, clickedTile) {
   }
   resetBoard(testGame.board)
   timer = new Date().getTime()
+  setTimeout(updateDisplayTimer, 50)
   for (let tile of allTiles(testGame.board)) {
     game.board[tile.x][tile.y].value = tile.value
   }
@@ -329,6 +344,7 @@ function smartSetupIntermediate(game, clickedTile) {
   }
   resetBoard(testGame.board)
   timer = new Date().getTime()
+  setTimeout(updateDisplayTimer, 50)
   for (let tile of allTiles(testGame.board)) {
     game.board[tile.x][tile.y].value = tile.value
   }
@@ -356,6 +372,7 @@ function smartSetupExpert(game, clickedTile) {
   console.log(usage)
   resetBoard(testGame.board)
   timer = new Date().getTime()
+  setTimeout(updateDisplayTimer, 50)
   for (let tile of allTiles(testGame.board)) {
     game.board[tile.x][tile.y].value = tile.value
   }
@@ -1427,7 +1444,6 @@ function updateConstraintsWithTile(constraints, game, x, y) {
     <div v-for="(row, index) in mainGame.board" :key="index" class="minesweeper-row">
       <button v-for="(tile, index) in row" :key="index" class="minesweeper-button" 
         :class="[{ active: tile.open }, { inactive: !tile.open }, 'm' + tile.value]"
-        :disabled=tile.open
         @contextmenu.prevent="markTile(mainGame, tile)"
         @click="clickTile(mainGame, tile)" >
         <img class="minesweeper-flag" v-if="!tile.open && tile.marked" src="@/assets/flag.svg">
@@ -1437,14 +1453,17 @@ function updateConstraintsWithTile(constraints, game, x, y) {
     </div>
   </div>
   <h4 id="minesweeper-mines-left-display">Mines Left: {{ mainGame.minesLeft }}</h4>
-  <button @click="resetGame(mainGame, 9, 9, 10, smartSetupBeginner)" id="minesweeper-new-game-button">New Beginner Game</button>
-  <button @click="resetGame(mainGame, 16, 16, 40, smartSetupIntermediate)" id="minesweeper-new-game-button">New Intermediate Game</button>
-  <button @click="resetGame(mainGame, 30, 16, 99, smartSetupExpert)" id="minesweeper-new-game-button">New Expert Game</button>
+  <h4>Score: {{ displayTimer }}</h4>
+  <button @click="resetGame(mainGame, 9, 9, 10, smartSetupBeginner, 'beginner')" id="minesweeper-new-game-button">New Beginner Game</button>
+  <button @click="resetGame(mainGame, 16, 16, 40, smartSetupIntermediate, 'intermediate')" id="minesweeper-new-game-button">New Intermediate Game</button>
+  <button @click="resetGame(mainGame, 30, 16, 99, smartSetupExpert, 'expert')" id="minesweeper-new-game-button">New Expert Game</button>
   <!-- button @click="runUnitTests(mainGame)" id="minesweeper-new-game-button">Tests (For Dev Use)</button>
   <button @click="runSolverTests(mainGame)" id="minesweeper-new-game-button">Autosolve (For Dev Use)</button -->
   <h2 v-if="mainGame.state === 'won'">You Won! B)</h2>
   <h2 v-if="mainGame.state === 'lost'">You Lost :(</h2>
-  <h3 style="margin-top: 2rem"> Beginner Leaderboard </h3>
+  <p style="margin-bottom: 0;">Your name (for leaderboard)</p>
+  <input v-model="name" v-uppercase>
+  <h3> Leaderboard </h3>
   <li v-for="highscore in sortedHighscores" :key="highscores.id">
      <span>{{ highscore.name }}: {{ highscore.score }}</span>
   </li>
