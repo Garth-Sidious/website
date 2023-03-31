@@ -5,6 +5,7 @@ import Chromatica from './components/Chromatica.vue';
 import Screensaver from './components/Screensaver.vue';
 import NotFound from './components/NotFound.vue';
 import "bootstrap/dist/css/bootstrap.min.css"
+import 'bootstrap/dist/js/bootstrap.min.js'
 import "bootstrap"
 
 const routes = {
