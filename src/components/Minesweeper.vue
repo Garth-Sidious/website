@@ -11,7 +11,7 @@ const HIDDEN_TILES = -1
 
 const highscores = useCollection(highscoresRef)
 const sortedHighscores = computed(() => {
-  return highscores.data.value.filter(a => a.board === mainGame.boardName).sort((a, b) => a.score > b.score).slice(0, 5)
+  return highscores.data.value.filter(a => a.board  === mainGame.boardName).sort((a, b) => a.score - b.score).slice(0, 5)
 })
 
 // Game states: setup (board displayed but not filled with mines), playing, won, lost
