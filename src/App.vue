@@ -9,8 +9,8 @@ import 'bootstrap/dist/js/bootstrap.min.js'
 import "bootstrap"
 
 const routes = {
-  '/': { view: Chromatica, text: 'Chromatica' },
-  '/minesweeper': { view: Minesweeper, text: 'Minesweeper' },
+  '/': { view: Minesweeper, text: 'Minesweeper' },
+  '/chromatica': { view: Chromatica, text: 'Chromatica' },
   '/screensaver': { view: Screensaver, text: 'Screensaver' }
 }
 

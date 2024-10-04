@@ -378,6 +378,34 @@ function smartSetupExpert(game, clickedTile) {
   }
 }
 
+function smartSetupBrockmode(game, clickedTile) {
+  timer = null
+  let testGame = {}
+  resetGame(testGame, 13, 13, 35, setupBoard)
+  clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
+  let usage = solveGameExpert(testGame)
+  let weightedUsage = 0
+  if (usage) {
+    weightedUsage = (usage[2] + usage[3])
+  }
+  while (weightedUsage < 2) {
+    resetGame(testGame, 13, 13, 35, setupBoard)
+    clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
+    usage = solveGameExpert(testGame)
+    weightedUsage = 0
+    if (usage) {
+      weightedUsage = (usage[2] + usage[3])
+    }
+  }
+  console.log(usage)
+  resetBoard(testGame.board)
+  timer = new Date().getTime()
+  setTimeout(updateDisplayTimer, 50)
+  for (let tile of allTiles(testGame.board)) {
+    game.board[tile.x][tile.y].value = tile.value
+  }
+}
+
 // Run a set of unit tests to make sure the various solvers work as intended
 function runUnitTests(game) {
   // Test extra mine marking
@@ -662,6 +690,17 @@ function runSolverTests(game) {
   //2441 3541 934 3084 intermediate
   //6 934 453 8607 expert-
   // REAL EXPERT DATA AT 4 (out of 100000): 1800 3, 136 33, 615 4, 115 43, the rest insignificant
+
+  // BROCKMODE investigation (out of 10k):
+  // 13 x 13
+  // 25 mines: 6495 valid, 10 nice
+  // 30 mines: 4158 valid, 16 nice
+  // 33 mines: 2553 valid, 21 nice
+  // 34 mines: 28 nice!
+  // 35 mines: 1756 valid, 17 nice
+  // 37 mines: 1113 valid, 12 nice
+  // 40 mines: 443 valid, 9 nice
+  // 45 mines: 63 valid, 2 nice
   const results = []
   const testGame = {} 
   console.time('10k iterations')
@@ -669,7 +708,7 @@ function runSolverTests(game) {
     if (i % 100 === 0) {
       console.log(i)
     }
-    resetGame(testGame, 7, 7, 10, setupBoard)
+    resetGame(testGame, 13, 13, 34, setupBoard)
     clickTile(testGame, testGame.board[0][0])
     const usage = solveGameExpert(testGame)
     if (usage) {
@@ -689,7 +728,7 @@ function runSolverTests(game) {
   console.timeEnd('10k iterations')
   results.sort()
   console.log(results)
-  resetGame(game, 7, 7, 10, setupBoard)
+  resetGame(game, 13, 13, 34, setupBoard)
   game.board = testGame.board
   game.tilesLeft = testGame.tilesLeft
   game.markedTiles = testGame.markedTiles
@@ -1457,6 +1496,7 @@ function updateConstraintsWithTile(constraints, game, x, y) {
   <button @click="resetGame(mainGame, 9, 9, 10, smartSetupBeginner, 'beginner')" id="minesweeper-new-game-button">New Beginner Game</button>
   <button @click="resetGame(mainGame, 16, 16, 40, smartSetupIntermediate, 'intermediate')" id="minesweeper-new-game-button">New Intermediate Game</button>
   <button @click="resetGame(mainGame, 30, 16, 99, smartSetupExpert, 'expert')" id="minesweeper-new-game-button">New Expert Game</button>
+  <button @click="resetGame(mainGame, 13, 13, 35, smartSetupBrockmode, 'brockmode')" id="minesweeper-new-game-button">New Brockmode Game</button>
   <!-- button @click="runUnitTests(mainGame)" id="minesweeper-new-game-button">Tests (For Dev Use)</button>
   <button @click="runSolverTests(mainGame)" id="minesweeper-new-game-button">Autosolve (For Dev Use)</button -->
   <h2 v-if="mainGame.state === 'won'">You Won! B)</h2>
