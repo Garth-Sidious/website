@@ -381,7 +381,7 @@ function smartSetupExpert(game, clickedTile) {
 function smartSetupBrockmode(game, clickedTile) {
   timer = null
   let testGame = {}
-  resetGame(testGame, 13, 13, 35, setupBoard)
+  resetGame(testGame, 13, 13, 40, setupBoard)
   clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
   let usage = solveGameExpert(testGame)
   let weightedUsage = 0
@@ -389,7 +389,7 @@ function smartSetupBrockmode(game, clickedTile) {
     weightedUsage = (usage[2] + usage[3])
   }
   while (weightedUsage < 2) {
-    resetGame(testGame, 13, 13, 35, setupBoard)
+    resetGame(testGame, 13, 13, 40, setupBoard)
     clickTile(testGame, testGame.board[clickedTile.x][clickedTile.y])
     usage = solveGameExpert(testGame)
     weightedUsage = 0
@@ -1496,7 +1496,7 @@ function updateConstraintsWithTile(constraints, game, x, y) {
   <button @click="resetGame(mainGame, 9, 9, 10, smartSetupBeginner, 'beginner')" id="minesweeper-new-game-button">New Beginner Game</button>
   <button @click="resetGame(mainGame, 16, 16, 40, smartSetupIntermediate, 'intermediate')" id="minesweeper-new-game-button">New Intermediate Game</button>
   <button @click="resetGame(mainGame, 30, 16, 99, smartSetupExpert, 'expert')" id="minesweeper-new-game-button">New Expert Game</button>
-  <button @click="resetGame(mainGame, 13, 13, 35, smartSetupBrockmode, 'brockmode')" id="minesweeper-new-game-button">New Brockmode Game</button>
+  <button @click="resetGame(mainGame, 13, 13, 40, smartSetupBrockmode, 'brockmode')" id="minesweeper-new-game-button">New Brockmode Game</button>
   <!-- button @click="runUnitTests(mainGame)" id="minesweeper-new-game-button">Tests (For Dev Use)</button>
   <button @click="runSolverTests(mainGame)" id="minesweeper-new-game-button">Autosolve (For Dev Use)</button -->
   <h2 v-if="mainGame.state === 'won'">You Won! B)</h2>
